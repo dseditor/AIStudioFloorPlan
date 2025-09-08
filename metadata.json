@@ -1,5 +1,5 @@
 {
-  "name": "FloorPlan",
+  "name": "FloorPlanMap",
   "description": "A simple tool to Transform 2D floor plans, edit and generate realistic interior scenes",
   "requestFramePermissions": []
 }

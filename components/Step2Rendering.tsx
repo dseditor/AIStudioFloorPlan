@@ -2,9 +2,10 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useState, useRef } from 'react';
-import { generateAIRendering } from '../services/geminiService';
+import React, { useState, useRef, ChangeEvent } from 'react';
+import { generateAIRendering, suggestPlanImprovements } from '../services/geminiService';
 import DrawingCanvas, { DrawingCanvasRef } from './DrawingCanvas';
+// FIX: Corrected import path for i18n module.
 import { Language, getTranslation } from '../lib/i18n';
 
 interface ImageHistory {
@@ -26,6 +27,7 @@ const Step2Rendering: React.FC<Step2RenderingProps> = ({ originalImage, onRender
     const [correctionInput, setCorrectionInput] = useState('');
     const [imageHistory, setImageHistory] = useState<ImageHistory[]>([]);
     const [currentMask, setCurrentMask] = useState<string>('');
+    const [isSuggesting, setIsSuggesting] = useState(false);
     
     const canvasRef = useRef<DrawingCanvasRef>(null);
 
@@ -64,35 +66,28 @@ const Step2Rendering: React.FC<Step2RenderingProps> = ({ originalImage, onRender
     };
 
     const submitCorrection = async () => {
+        const maskBase64 = canvasRef.current ? canvasRef.current.getMaskBase64() : '';
+
         if (!correctionInput.trim()) {
             alert(getTranslation('enterCorrectionAlert', language));
-            return;
-        }
-        
-        if (!canvasRef.current) {
-            alert(getTranslation('markAreaAlert', language));
-            return;
-        }
-        
-        const maskBase64 = canvasRef.current.getMaskBase64();
-        if (!maskBase64) {
-            alert(getTranslation('markAreaAlert', language));
             return;
         }
         
         setIsGenerating(true);
         
         try {
-            // Add current image to history before editing
             if (renderedImage) {
                 setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
             }
             
-            const result = await generateAIRendering(renderedImage, correctionInput, maskBase64);
+            const result = await generateAIRendering(
+                renderedImage, 
+                correctionInput, 
+                maskBase64
+            );
             setRenderedImage(result);
             setCorrectionInput('');
             
-            // Clear the canvas
             if (canvasRef.current) {
                 canvasRef.current.clearCanvas();
             }
@@ -108,8 +103,29 @@ const Step2Rendering: React.FC<Step2RenderingProps> = ({ originalImage, onRender
         }
     };
 
+    const handleSuggestImprovement = async () => {
+        if (!renderedImage) return;
+    
+        setIsSuggesting(true);
+        try {
+            const suggestion = await suggestPlanImprovements(renderedImage);
+            setCorrectionInput(suggestion);
+        } catch (error) {
+            console.error('Failed to get suggestion:', error);
+            alert(getTranslation('suggestionFailed', language));
+        } finally {
+            setIsSuggesting(false);
+        }
+    };
+
     const applyAutoMaterial = async () => {
         const autoMaterialPrompt = `Enhance this architectural rendering with realistic materials and textures:
+
+SYMBOL INTERPRETATION:
+- A rectangle or square with a large 'X' drawn through it is a system cabinet (系統櫃). Render this as a built-in system cabinet with a top-down view.
+
+FURNITURE & FIXTURES:
+- For any furniture like beds, sofas, wardrobes, and cabinets, apply varied and distinct colors and materials for each individual piece. For example, if there are two sofas, render them in different colors to create a more dynamic and diverse interior.
 
 FLOORING MATERIALS:
 - Apply appropriate flooring for each room type (hardwood for living areas, tiles for bathrooms/kitchens, carpet for bedrooms)
@@ -118,7 +134,7 @@ FLOORING MATERIALS:
 WALL FINISHES:
 - Add realistic wall textures (painted drywall, concrete, brick where appropriate)
 - Maintain clean, professional appearance
-- Use neutral color palette suitable for interior spaces
+- Use a neutral color palette suitable for interior spaces
 
 LIGHTING & SHADOWS:
 - Add realistic natural lighting from windows
@@ -130,7 +146,7 @@ MAINTAIN PRECISION:
 - Do not alter room layouts, wall positions, or openings
 - Focus only on material enhancement, not structural changes
 
-IMPORTANT: Generate a photorealistic architectural visualization with enhanced materials.`;
+IMPORTANT: Generate a photorealistic architectural visualization with enhanced materials, ensuring correct interpretation of symbols and color diversity for furniture.`;
 
         setIsGenerating(true);
         
@@ -277,19 +293,34 @@ IMPORTANT: Generate a photorealistic architectural visualization with enhanced m
                                 id="correction-input"
                                 value={correctionInput}
                                 onChange={(e) => setCorrectionInput(e.target.value)}
-                                className="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                                className="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-slate-900" 
                                 placeholder={getTranslation('correctionInputPlaceholder', language)}
                             />
+                             <button 
+                                onClick={handleSuggestImprovement}
+                                disabled={isGenerating || isSuggesting}
+                                className="px-6 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center justify-center"
+                            >
+                                {isSuggesting ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        {getTranslation('suggestingImprovement', language)}
+                                    </>
+                                ) : getTranslation('suggestImprovement', language)}
+                            </button>
                             <button 
                                 onClick={submitCorrection}
-                                disabled={isGenerating}
+                                disabled={isGenerating || isSuggesting}
                                 className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 whitespace-nowrap"
                             >
                                 {getTranslation('submitCorrection', language)}
                             </button>
                         </div>
                     </div>
-                    
+
                     <div className="flex flex-wrap gap-3 pt-2">
                         <button 
                             onClick={applyAutoMaterial}

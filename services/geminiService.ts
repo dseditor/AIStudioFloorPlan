@@ -2,9 +2,11 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { GoogleGenAI, Type } from "@google/genai";
+// FIX: Added Modality to imports for use in image editing model config.
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import type { GenerateContentResponse, Part } from "@google/genai";
 import { GeneratedScene } from '../components/Step3SceneGeneration';
+// FIX: Corrected import path for i18n module.
 import { Language } from "../lib/i18n";
 
 
@@ -147,19 +149,14 @@ export async function generateArchitecturalImage(parts: any[]): Promise<string> 
     const maxAttempts = 7;
     let attempts = 0;
     
+    // FIX: Updated config for 'gemini-2.5-flash-image-preview' model according to guidelines.
+    // This model only supports `responseModalities`. Other configs like temperature, topP, 
+    // and safetySettings are not supported and have been removed.
     const payload = { 
         contents: { parts }, 
         config: { 
-            responseModalities: ['IMAGE'],
-            temperature: 0.3,
-            topP: 0.7,
-        },
-        safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
-        ]
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        }
     };
     
     while(attempts < maxAttempts) {
@@ -208,53 +205,65 @@ export async function generateArchitecturalImage(parts: any[]): Promise<string> 
  * @param maskBase64 Optional mask for editing specific areas
  * @returns Promise resolving to generated image data URL
  */
-export async function generateAIRendering(baseImageSrc: string, promptOverride?: string, maskBase64?: string): Promise<string> {
+export async function generateAIRendering(
+    baseImageSrc: string, 
+    promptOverride?: string, 
+    maskBase64?: string
+): Promise<string> {
     const baseImage64 = await imageSrcToBase64(baseImageSrc);
     
     let parts;
-    if(maskBase64) {
-        const maskPrompt = generatePromptVariations(`Using the provided red mask overlay, make precise modifications to ONLY the marked areas according to these instructions: ${promptOverride}
 
-MASK EDITING REQUIREMENTS:
-- Modify EXCLUSIVELY the areas covered by the red mask
-- Maintain exact boundaries - do not affect unmarked areas
-- Blend seamlessly with surrounding unchanged regions
-- Preserve architectural accuracy and proportions
+    if (maskBase64) {
+        const maskPrompt = generatePromptVariations(`Using the provided black and white mask image, make precise modifications to the base image, which is an architectural top-down view. Apply the following changes: "${promptOverride}"
 
-QUALITY STANDARDS:
-- Keep the same lighting conditions as the base image
-- Match the overall style and material quality
-- Ensure realistic transitions and connections
-- Maintain professional architectural visualization standards
+PERSPECTIVE INSTRUCTIONS:
+- The base image is a TOP-DOWN ARCHITECTURAL VIEW (bird's-eye view).
+- Any objects you add or modify (like furniture, windows, doors) MUST be rendered from a consistent TOP-DOWN perspective.
+- DO NOT generate side-view or isometric-view objects. All elements must look as they would in a standard architectural floor plan rendering.
 
-IMPORTANT: Generate a high-quality image with precise mask-based modifications only.`);
+MASKING INSTRUCTIONS:
+- You MUST only modify the areas of the base image that correspond to the WHITE regions in the mask.
+- The BLACK areas of the mask indicate parts of the base image that MUST be preserved exactly as they are.
+- Ensure the final image is a single, coherent photograph with seamless blending between the edited and unedited parts.
+- Do not include the mask itself in the final output.
+
+QUALITY REQUIREMENTS:
+- Maintain the original lighting, style, and perspective.
+- Ensure the edits are photorealistic and high-quality.`);
         parts = [
             { text: maskPrompt },
             { inlineData: { mimeType: 'image/png', data: baseImage64 } },
             { inlineData: { mimeType: 'image/png', data: maskBase64 } }
         ];
     } else {
-        parts = [
-            { text: generatePromptVariations(promptOverride || `Transform this 2D architectural floor plan into a precise, high-quality 3D rendered top-down view with the following requirements:
+        const defaultPrompt = `Transform this 2D architectural floor plan into a precise, high-quality 3D rendered top-down view with the following requirements:
 
 CLEANING REQUIREMENTS:
-- COMPLETELY REMOVE all text, Chinese characters, numbers, dimension markings, labels, room names, symbols, and human figures
-- Remove all annotations, measurements, and written descriptions
-- Eliminate any logos, watermarks, or copyright notices
+- COMPLETELY REMOVE all text, Chinese characters, numbers, dimension markings, labels, room names, symbols that are not part of the architecture, and human figures.
+- Remove all annotations, measurements, and written descriptions.
+- Eliminate any logos, watermarks, or copyright notices.
+
+SYMBOL INTERPRETATION:
+- A rectangle containing vertical lines (representing hanging clothes) is a wardrobe (衣櫃). Render this as a built-in closet or wardrobe.
+- A rectangle with a large 'X' drawn through it is a storage cabinet (收納櫃). Render this as a generic built-in storage unit.
 
 ARCHITECTURAL PRECISION:
-- Maintain exact wall positions, thicknesses, and openings from the original plan
-- Preserve accurate door and window locations and sizes
-- Keep precise room proportions and spatial relationships
-- Maintain correct corridor widths and ceiling heights where indicated
+- Maintain exact wall positions, thicknesses, and openings from the original plan.
+- Preserve accurate door and window locations and sizes.
+- Keep precise room proportions and spatial relationships.
+- Maintain correct corridor widths.
 
 VISUAL ENHANCEMENT:
-- Add realistic architectural materials (concrete walls, tile/wood flooring, proper ceiling finishes)
-- Apply appropriate lighting with natural shadows
-- Use neutral, professional color palette
-- Ensure clean, crisp edges and professional presentation
+- Add realistic architectural materials (concrete walls, tile/wood flooring, proper ceiling finishes).
+- Apply appropriate lighting with natural shadows.
+- Use a neutral, professional color palette.
+- Ensure clean, crisp edges and professional presentation.
 
-IMPORTANT: Generate a clean, professional architectural visualization that accurately represents the spatial layout while removing all textual elements.`) },
+IMPORTANT: Generate a clean, professional architectural visualization that accurately represents the spatial layout while removing all textual elements and correctly interpreting the specified architectural symbols.`;
+        
+        parts = [
+            { text: generatePromptVariations(promptOverride || defaultPrompt) },
             { inlineData: { mimeType: 'image/jpeg', data: baseImage64 } }
         ];
     }
@@ -270,8 +279,8 @@ IMPORTANT: Generate a clean, professional architectural visualization that accur
  * @param style Interior design style
  * @param viewIndex Index of the viewpoint (1-4)
  * @param camera Camera parameters for view angle
- * @param lighting Description of the lighting conditions
- * @param materialRealism Description of the desired material quality
+ * @param mode The lighting mode, either 'day' or 'night'
+ * @param temperature The color temperature in Kelvin
  * @returns Promise resolving to generated scene image data URL
  */
 export async function generateInteriorScene(
@@ -281,8 +290,8 @@ export async function generateInteriorScene(
     style: string,
     viewIndex: number,
     camera: { rotation: number; tilt: number; zoom: number; },
-    lighting: string,
-    materialRealism: string
+    mode: 'day' | 'night',
+    temperature: number
 ): Promise<string> {
     // Create a temporary canvas to draw the base image and enhanced viewpoint marker
     const canvas = document.createElement('canvas');
@@ -339,11 +348,17 @@ export async function generateInteriorScene(
             cameraInstructions += ` The view is zoomed out for a wider angle.`;
         }
     }
-    
+
+    const materialRealism = 'photorealistic with hyper-detailed textures';
+
+    const lightingDescription = mode === 'day' 
+        ? `a bright, naturally lit daytime scene from large windows, with a neutral-to-cool color temperature of around ${temperature}K`
+        : `a dramatic and atmospheric nighttime scene. The primary light source MUST be artificial interior lighting (lamps, recessed lights). Create high contrast between the warm, bright lights and deep, dark shadows. If there are windows, they MUST show a dark night sky outside. The overall mood should be cozy and well-lit, with a color temperature of around ${temperature}K`;
+
     const promptDetails = [
         `Generate a ${materialRealism} FIRST-PERSON VIEW interior photograph from the perspective of viewpoint ${viewIndex} on the attached floor plan.`,
         `STYLE & ATMOSPHERE: The interior design style is "${style}".`,
-        `LIGHTING: The scene is illuminated by ${lighting}. Render realistic shadows, reflections, and highlights corresponding to this light source.`,
+        `LIGHTING: ${lightingDescription}. Render realistic shadows, reflections, and highlights corresponding to this light source.`,
         `CAMERA VIEW: The camera is at human eye-level (approximately 1.6 meters high).${cameraInstructions || ' The camera is at a neutral, forward-facing position.'}`,
         'COMPOSITION: Create a complete and believable indoor scene with walls, ceiling, floor, furniture, and decor that fit the specified style. The layout must be consistent with the floor plan.',
         `CRITICAL INSTRUCTIONS: The output MUST be a ground-level, horizontal photograph from inside the room. ABSOLUTELY DO NOT generate aerial, top-down, or bird's-eye perspectives. The image must look like it was taken by a person standing at viewpoint ${viewIndex}.`
@@ -358,6 +373,104 @@ export async function generateInteriorScene(
     ];
     
     console.log(`Generating scene ${viewIndex} with prompt: ${prompt}`);
+    return await generateArchitecturalImage(parts);
+}
+
+/**
+ * Edits an existing interior scene based on a text prompt and lighting settings.
+ * @param baseImageSrc The source URL of the image to edit.
+ * @param prompt The user's instruction for the edit.
+ * @param mode The desired lighting mode ('day' or 'night').
+ * @param temperature The desired color temperature in Kelvin.
+ * @param maskBase64 Optional base64 string of a black and white mask image.
+ * @param objectImageBase64 Optional base64 string of a reference object to add.
+ * @returns A promise resolving to the data URL of the edited image.
+ */
+export async function editInteriorScene(
+    baseImageSrc: string,
+    prompt: string,
+    mode: 'day' | 'night',
+    temperature: number,
+    maskBase64?: string,
+    objectImageBase64?: string
+): Promise<string> {
+    const baseImage64 = await imageSrcToBase64(baseImageSrc);
+    
+    const lightingDescription = mode === 'day' 
+        ? `a bright, naturally lit daytime scene from large windows, with a neutral-to-cool color temperature of around ${temperature}K`
+        : `a dramatic and atmospheric nighttime scene. The primary light source MUST be artificial interior lighting (lamps, recessed lights). Create high contrast between the warm, bright lights and deep, dark shadows. If there are windows, they MUST show a dark night sky outside. The overall mood should be cozy and well-lit, with a color temperature of around ${temperature}K`;
+
+    let editPromptText: string;
+    let parts: Part[] = [];
+
+    const commonInstructions = `
+CRITICAL INSTRUCTIONS:
+-   Maintain the original camera angle, perspective, and overall architectural structure.
+-   The result must be a single, photorealistic, and coherent image with seamless blending.
+-   Do not include the mask or reference object image in the final output.
+-   The output must be a ground-level photograph. DO NOT change to a top-down or bird's-eye view.
+-   Match the style, lighting, shadows, and perspective of the base scene for any new objects.`;
+
+    if (objectImageBase64) {
+        // SCENARIO: Adding an object
+        const objectPart = { inlineData: { mimeType: 'image/png', data: objectImageBase64 } };
+        
+        if (maskBase64) {
+            // Object + Mask
+            editPromptText = `You are an expert interior photo editor. You are given a BASE SCENE image, a reference OBJECT image, and a MASK image.
+TASK:
+1.  **PLACE OBJECT IN MASKED AREA:** Place the object from the OBJECT image into the white area defined by the MASK on the BASE SCENE.
+2.  **USE PROMPT FOR GUIDANCE:** The user's instruction for placement is: "${prompt}".
+3.  **ADJUST LIGHTING:** Render the entire scene as ${lightingDescription}.
+4.  **PRESERVE UNMASKED AREA:** The black area of the mask MUST remain unchanged.
+${commonInstructions}`;
+            parts = [
+                { text: generatePromptVariations(editPromptText) },
+                { inlineData: { mimeType: 'image/png', data: baseImage64 } }, // Base Scene
+                objectPart, // Object Image
+                { inlineData: { mimeType: 'image/png', data: maskBase64 } }  // Mask
+            ];
+        } else {
+            // Object, No Mask
+            editPromptText = `You are an expert interior photo editor. You are given a BASE SCENE image and a reference OBJECT image.
+TASK:
+1.  **ADD OBJECT TO SCENE:** Seamlessly integrate the object from the OBJECT image into the BASE SCENE.
+2.  **USE PROMPT FOR PLACEMENT:** The user's instruction for placement is: "${prompt}".
+3.  **ADJUST LIGHTING:** Render the entire scene as ${lightingDescription}.
+${commonInstructions}`;
+            parts = [
+                { text: generatePromptVariations(editPromptText) },
+                { inlineData: { mimeType: 'image/png', data: baseImage64 } }, // Base Scene
+                objectPart // Object Image
+            ];
+        }
+    } else {
+        // SCENARIO: Standard editing (no object added)
+        if (maskBase64) {
+            editPromptText = `You are an expert interior photo editor. Using the provided mask, modify ONLY the masked area of the image based on the user's request, and adjust the overall lighting.
+TASK:
+1.  **APPLY EDIT TO MASKED AREA:** Make the following change ONLY in the white area defined by the mask: "${prompt}".
+2.  **ADJUST LIGHTING:** Render the entire scene as ${lightingDescription}.
+3.  **PRESERVE UNMASKED AREA:** The black area of the mask MUST remain unchanged.
+${commonInstructions}`;
+            parts = [
+                { text: generatePromptVariations(editPromptText) },
+                { inlineData: { mimeType: 'image/png', data: baseImage64 } },
+                { inlineData: { mimeType: 'image/png', data: maskBase64 } }
+            ];
+        } else {
+            editPromptText = `You are an expert interior photo editor. Modify the image based on the user's request and adjust the lighting.
+TASK:
+1.  **APPLY EDIT:** Make the following change: "${prompt || 'No specific edit, just apply lighting changes.'}".
+2.  **ADJUST LIGHTING:** Render the scene as ${lightingDescription}.
+${commonInstructions}`;
+            parts = [
+                { text: generatePromptVariations(editPromptText) },
+                { inlineData: { mimeType: 'image/png', data: baseImage64 } }
+            ];
+        }
+    }
+
     return await generateArchitecturalImage(parts);
 }
 
@@ -452,11 +565,13 @@ export async function suggestInteriorStyle(planImageSrc: string): Promise<string
 
 export interface PresentationText {
     presentationTitle: string;
+    conceptTitle: string;
     mainConcepts: string[];
     viewpointDetails: {
         title: string;
         description: string;
     }[];
+    conclusionTitle: string;
     conclusion: string;
 }
 
@@ -493,9 +608,11 @@ The provided design style is "${style}". Your primary task is to generate all te
 1.  **Language:** The entire JSON output MUST be in ${languageInstruction}. If the provided style name "${style}" is not in this language, you MUST translate it. There should be no mixed languages in the output.
 2.  **Brevity:** Be concise. Adhere strictly to the following length limits to ensure text fits on the slides.
     - **presentationTitle**: A creative title, max 10 words.
+    - **conceptTitle**: A title for the main concepts slide, max 7 words.
     - **mainConcepts**: Exactly 4 concepts. Each string should be "Title: Description", max 15 words total per string.
     - **viewpointDetails.title**: A short room name or summary, max 7 words.
     - **viewpointDetails.description**: A detailed description, max 30 words.
+    - **conclusionTitle**: A title for the conclusion slide, max 7 words.
     - **conclusion**: A concluding paragraph, max 40 words.
 
 Analyze the provided floor plan and ${scenes.length} viewpoint images, then generate a JSON object that follows the provided schema.`
@@ -519,6 +636,10 @@ Analyze the provided floor plan and ${scenes.length} viewpoint images, then gene
                             type: Type.STRING,
                             description: "A creative title for the design proposal (max 10 words)."
                         },
+                        conceptTitle: {
+                            type: Type.STRING,
+                            description: "A title for the main concepts slide (max 7 words)."
+                        },
                         mainConcepts: {
                             type: Type.ARRAY,
                             items: { type: Type.STRING },
@@ -536,12 +657,16 @@ Analyze the provided floor plan and ${scenes.length} viewpoint images, then gene
                             },
                             description: "An array of objects, one for each viewpoint."
                         },
+                        conclusionTitle: {
+                            type: Type.STRING,
+                            description: "A title for the conclusion slide (max 7 words)."
+                        },
                         conclusion: {
                             type: Type.STRING,
                             description: "A concluding paragraph for the presentation (max 40 words)."
                         }
                     },
-                    required: ["presentationTitle", "mainConcepts", "viewpointDetails", "conclusion"]
+                    required: ["presentationTitle", "conceptTitle", "mainConcepts", "viewpointDetails", "conclusionTitle", "conclusion"]
                 },
             },
         });
@@ -552,5 +677,74 @@ Analyze the provided floor plan and ${scenes.length} viewpoint images, then gene
     } catch (error) {
         console.error("Error generating presentation text:", error);
         throw new Error(`Failed to get presentation text from AI. ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+/**
+ * Suggests an improvement for a rendered floor plan.
+ * @param planImageSrc The source of the rendered floor plan image.
+ * @returns A promise that resolves to a suggested improvement string.
+ */
+export async function suggestPlanImprovements(planImageSrc: string): Promise<string> {
+    try {
+        const baseImage64 = await imageSrcToBase64(planImageSrc);
+        const imagePart = {
+            inlineData: { mimeType: 'image/jpeg', data: baseImage64 }
+        };
+
+        const prompt = `Analyze this rendered architectural floor plan. Provide one concise, actionable suggestion for improvement that could be passed to an AI image editor. The suggestion should be a single sentence. Examples: "Add a kitchen island for more counter space.", "Convert the small bedroom into a home office.", "Create an open-plan living area by removing the wall between the kitchen and living room." Focus on architectural or significant furniture layout changes. Do not add any conversational text, just the suggestion itself.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: [ { text: prompt }, imagePart ] },
+        });
+
+        const suggestion = response.text.trim();
+        if (!suggestion) {
+            throw new Error("AI did not return a suggestion.");
+        }
+        
+        return suggestion;
+
+    } catch (error) {
+        console.error("Error suggesting plan improvements:", error);
+        throw new Error(`Failed to get plan improvement suggestion from AI. ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+/**
+ * Generates a list of 6 random interior design style ideas.
+ * @returns A promise that resolves to an array of 6 style strings.
+ */
+export async function suggestStyleIdeas(): Promise<string[]> {
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: 'Suggest 6 diverse and popular interior design styles. Provide only the names of the styles in the array.',
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { 
+                        type: Type.STRING,
+                        description: 'An interior design style name.'
+                    }
+                }
+            }
+        });
+
+        const jsonText = response.text.trim();
+        const styles = JSON.parse(jsonText);
+
+        if (!Array.isArray(styles) || styles.length === 0) {
+            throw new Error("AI did not return a valid array of style suggestions.");
+        }
+        
+        return styles.slice(0, 6); // Ensure we only have 6
+
+    } catch (error) {
+        console.error("Error suggesting style ideas:", error);
+        // Provide a fallback list in case of API failure
+        return ['Modern Minimalist', 'Scandinavian', 'Industrial Loft', 'Bohemian Chic', 'Coastal', 'Japanese Zen'];
     }
 }

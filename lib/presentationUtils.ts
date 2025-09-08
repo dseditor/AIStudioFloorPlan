@@ -2,443 +2,320 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { GeneratedScene } from '../components/Step3SceneGeneration';
-import type { PresentationText } from '../services/geminiService';
+import { PresentationText } from '../services/geminiService';
+import { GeneratedScene } from '../components/Step3SceneGeneration';
 import { Language, getTranslation } from './i18n';
 
-const SLIDE_WIDTH = 1920;
-const SLIDE_HEIGHT = 1080;
-const FONT_FAMILY = `'Roboto', 'Noto Sans TC', sans-serif`;
+type ColorThemeNameKey = 'themeModernBlue' | 'themeEarthTones' | 'themeMinimalistGray' | 'themeVibrantCreative' | 'themeElegantNoir' | 'themeSakuraPink';
 
 export interface ColorTheme {
-    name: string;
-    background: string;
-    primaryText: string;
-    secondaryText: string;
-    accent: string;
-    titleText: string;
-    slideFooter: string;
+    nameKey: ColorThemeNameKey;
+    colors: {
+        background: string;
+        primaryText: string;
+        secondaryText: string;
+        accent: string;
+        titleBackground: string;
+    };
 }
 
-export const themes: Record<string, ColorTheme> = {
-    modernBlue: {
-        name: 'Modern Blue',
-        background: '#f9fafb',
-        primaryText: '#1f2937',
-        secondaryText: '#4b5563',
-        accent: '#1e3a8a',
-        titleText: '#111827',
-        slideFooter: '#6b7280',
+export const themes: ColorTheme[] = [
+    {
+        nameKey: 'themeModernBlue',
+        colors: { background: '#FFFFFF', primaryText: '#1E3A8A', secondaryText: '#475569', accent: '#3B82F6', titleBackground: 'rgba(255, 255, 255, 0.7)' }
     },
-    warmEarth: {
-        name: 'Warm Earth',
-        background: '#fdf6e3',
-        primaryText: '#5d4037',
-        secondaryText: '#795548',
-        accent: '#c85a19',
-        titleText: '#4e342e',
-        slideFooter: '#a1887f',
+    {
+        nameKey: 'themeEarthTones',
+        colors: { background: '#FBF9F6', primaryText: '#5D4037', secondaryText: '#795548', accent: '#A1887F', titleBackground: 'rgba(255, 255, 255, 0.7)' }
     },
-    minimalistGray: {
-        name: 'Minimalist Gray',
-        background: '#f8f9fa',
-        primaryText: '#212529',
-        secondaryText: '#495057',
-        accent: '#343a40',
-        titleText: '#000000',
-        slideFooter: '#adb5bd',
+    {
+        nameKey: 'themeMinimalistGray',
+        colors: { background: '#F3F4F6', primaryText: '#111827', secondaryText: '#4B5563', accent: '#6B7280', titleBackground: 'rgba(255, 255, 255, 0.7)' }
     },
-    boldTeal: {
-        name: 'Bold Teal',
-        background: '#f0f9ff',
-        primaryText: '#334155',
-        secondaryText: '#475569',
-        accent: '#0d9488',
-        titleText: '#1e293b',
-        slideFooter: '#94a3b8',
+    {
+        nameKey: 'themeVibrantCreative',
+        colors: { background: '#FFFBEB', primaryText: '#854D0E', secondaryText: '#B45309', accent: '#F59E0B', titleBackground: 'rgba(255, 255, 255, 0.7)' }
+    },
+    {
+        nameKey: 'themeElegantNoir',
+        colors: { background: '#212121', primaryText: '#FFFFFF', secondaryText: '#BDBDBD', accent: '#D4AF37', titleBackground: 'rgba(0, 0, 0, 0.6)' }
+    },
+    {
+        nameKey: 'themeSakuraPink',
+        colors: { background: '#FFF5F7', primaryText: '#5B21B6', secondaryText: '#4A044E', accent: '#F472B6', titleBackground: 'rgba(255, 255, 255, 0.7)' }
     }
-};
+];
+
+const CANVAS_WIDTH = 1920;
+const CANVAS_HEIGHT = 1080;
+const PADDING = 80;
+
+// Banner layout constants
+const BANNER_Y = CANVAS_HEIGHT * 0.6;
+const BANNER_HEIGHT = CANVAS_HEIGHT * 0.4;
+const BANNER_PADDING = PADDING * 1.5;
 
 
-async function loadImages(urls: string[]): Promise<HTMLImageElement[]> {
-    const promises = urls.map(src => {
-        return new Promise<HTMLImageElement>((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = (err) => reject(new Error(`Failed to load image: ${src.substring(0, 50)}...`));
-            img.src = src;
-        });
+function loadImage(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
     });
-    return Promise.all(promises);
 }
 
+/**
+ * Wraps text to fit a specified width, handling explicit newlines and different languages.
+ * @param ctx The canvas rendering context.
+ * @param text The text to wrap.
+ * @param maxWidth The maximum width for a line.
+ * @returns An array of strings, where each string is a line of wrapped text.
+ */
 function getLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-    const lines: string[] = [];
-    if (!text) return lines;
+    const finalLines: string[] = [];
+    if (!text) return finalLines;
 
-    // Check for Chinese characters to determine wrapping strategy
-    const hasChinese = /[\u4e00-\u9fa5]/.test(text);
+    const paragraphs = text.split('\n');
+    const hasChinese = /[\u4E00-\u9FA5]/.test(text);
 
-    if (hasChinese) {
-        // Character-by-character wrapping for Chinese and mixed content
-        let currentLine = '';
-        for (const char of text) {
-            if (char === '\n') {
-                lines.push(currentLine);
-                currentLine = '';
-                continue;
-            }
-            const testLine = currentLine + char;
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && currentLine !== '') {
-                lines.push(currentLine);
-                currentLine = char;
-            } else {
-                currentLine = testLine;
-            }
+    for (const paragraph of paragraphs) {
+        if (paragraph === '') {
+            finalLines.push('');
+            continue;
         }
-        if (currentLine) {
-            lines.push(currentLine);
-        }
-    } else {
-        // Word-based wrapping for English and other space-delimited languages
-        const words = text.split(' ');
-        let currentLine = '';
-        for (const word of words) {
-            if (!word) continue;
-            const testLine = currentLine === '' ? word : `${currentLine} ${word}`;
-            const metrics = ctx.measureText(testLine);
 
-            if (metrics.width > maxWidth && currentLine !== '') {
-                lines.push(currentLine);
-                currentLine = word;
-            } else {
-                currentLine = testLine;
+        if (hasChinese) {
+            let currentLine = '';
+            for (const char of paragraph) {
+                const testLine = currentLine + char;
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && currentLine !== '') {
+                    finalLines.push(currentLine);
+                    currentLine = char;
+                } else {
+                    currentLine = testLine;
+                }
             }
-        }
-        if (currentLine) {
-            lines.push(currentLine);
+            finalLines.push(currentLine);
+        } else { // Word-based wrapping for English and other languages
+            const words = paragraph.split(' ');
+            let currentLine = '';
+            for (const word of words) {
+                const testLine = currentLine === '' ? word : `${currentLine} ${word}`;
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && currentLine !== '') {
+                    finalLines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            finalLines.push(currentLine);
         }
     }
-
-    return lines;
+    return finalLines;
 }
 
 
-function drawTextWithDynamicSize(
+/**
+ * Draws text on the canvas, automatically adjusting font size to fit within a bounding box.
+ */
+function drawTextWithAutoSize(
     ctx: CanvasRenderingContext2D,
     text: string,
-    options: {
-        x: number,
-        y: number,
-        maxWidth: number,
-        maxHeight: number,
-        initialFontSize: number,
-        minFontSize: number,
-        lineHeightRatio: number,
-        weight: 'normal' | 'bold',
-        align?: 'left' | 'center' | 'right',
-        color: string
-    }
+    x: number, y: number,
+    maxWidth: number, maxHeight: number,
+    baseFont: string, lineHeight: number, align: 'left' | 'center' | 'right' = 'left'
 ) {
-    let fontSize = options.initialFontSize;
-    ctx.textAlign = options.align || 'left';
-    ctx.fillStyle = options.color;
-
-    while(fontSize >= options.minFontSize) {
-        const font = `${options.weight} ${fontSize}px ${FONT_FAMILY}`;
-        ctx.font = font;
-        const lineHeight = fontSize * options.lineHeightRatio;
-        const lines = getLines(ctx, text, options.maxWidth);
-        const textHeight = lines.length * lineHeight;
-
-        if (textHeight <= options.maxHeight) {
-            // It fits, we can draw it
-            lines.forEach((line, index) => {
-                let x = options.x;
-                if (options.align === 'center') {
-                    x = options.x + options.maxWidth / 2;
-                } else if (options.align === 'right') {
-                    x = options.x + options.maxWidth;
+    let fontSize = parseInt(baseFont.match(/(\d+)px/)?.[1] || '60', 10);
+    const baseFontSize = fontSize;
+    
+    while (fontSize > 10) {
+        ctx.font = baseFont.replace(/\d+px/, `${fontSize}px`);
+        const currentLineHeight = lineHeight * (fontSize / baseFontSize);
+        const lines = getLines(ctx, text, maxWidth);
+        const totalHeight = lines.length * currentLineHeight;
+        
+        if (totalHeight <= maxHeight) {
+            let startY = y;
+            for (const line of lines) {
+                let startX = x;
+                if (align === 'center') {
+                    startX = x + (maxWidth - ctx.measureText(line).width) / 2;
+                } else if (align === 'right') {
+                    startX = x + (maxWidth - ctx.measureText(line).width);
                 }
-                ctx.fillText(line, x, options.y + (index * lineHeight));
-            });
+                ctx.fillText(line, startX, startY);
+                startY += currentLineHeight;
+            }
             return;
         }
-
-        fontSize -= 2; // Reduce font size and try again
+        fontSize -= 2; // Decrease font size and try again
     }
     
-    // If it still doesn't fit, draw it truncated (optional, for now we just draw at min size)
-     const font = `${options.weight} ${options.minFontSize}px ${FONT_FAMILY}`;
-     ctx.font = font;
-     const lineHeight = options.minFontSize * options.lineHeightRatio;
-     const lines = getLines(ctx, text, options.maxWidth);
-     lines.forEach((line, index) => {
-         const y = options.y + (index * lineHeight);
-         if(y < options.y + options.maxHeight - lineHeight){
-             let x = options.x;
-                if (options.align === 'center') {
-                    x = options.x + options.maxWidth / 2;
-                } else if (options.align === 'right') {
-                    x = options.x + options.maxWidth;
-                }
-             ctx.fillText(line, x, y);
-         }
-     });
-
-}
-
-
-function drawTitleSlide(ctx: CanvasRenderingContext2D, title: string, sceneImages: HTMLImageElement[], language: Language, theme: ColorTheme) {
-    // 1. Draw image montage background
-    const numImages = sceneImages.length;
-    const cols = Math.ceil(Math.sqrt(numImages));
-    const rows = Math.ceil(numImages / cols);
-    const cellWidth = SLIDE_WIDTH / cols;
-    const cellHeight = SLIDE_HEIGHT / rows;
-
-    sceneImages.forEach((img, index) => {
-        const row = Math.floor(index / cols);
-        const col = index % cols;
-        const x = col * cellWidth;
-        const y = row * cellHeight;
-
-        const imgRatio = img.width / img.height;
-        const cellRatio = cellWidth / cellHeight;
-        let sx, sy, sWidth, sHeight;
-
-        if (imgRatio > cellRatio) {
-            sHeight = img.height;
-            sWidth = sHeight * cellRatio;
-            sx = (img.width - sWidth) / 2;
-            sy = 0;
-        } else {
-            sWidth = img.width;
-            sHeight = sWidth / cellRatio;
-            sx = 0;
-            sy = (img.height - sHeight) / 2;
+    // If it still doesn't fit, draw with the smallest font size and truncate
+    ctx.font = baseFont.replace(/\d+px/, `${fontSize}px`);
+    const finalLineHeight = lineHeight * (fontSize / baseFontSize);
+    let startY = y;
+    const lines = getLines(ctx, text, maxWidth);
+    for (const line of lines) {
+        let startX = x;
+         if (align === 'center') {
+            startX = x + (maxWidth - ctx.measureText(line).width) / 2;
+        } else if (align === 'right') {
+            startX = x + (maxWidth - ctx.measureText(line).width);
         }
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, cellWidth, cellHeight);
-    });
+        ctx.fillText(line, startX, startY);
+        startY += finalLineHeight;
+        if (startY > y + maxHeight - finalLineHeight) break; // Stop if exceeding max height
+    }
+}
 
-    // 2. Draw semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.fillRect(0, 0, SLIDE_WIDTH, SLIDE_HEIGHT);
+/**
+ * Draws an image to fill the entire canvas, cropping as needed while preserving aspect ratio.
+ */
+function drawFullBleedImage(ctx: CanvasRenderingContext2D, image: HTMLImageElement) {
+    const sWidth = image.naturalWidth;
+    const sHeight = image.naturalHeight;
+    const sAspect = sWidth / sHeight;
+    const dAspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+    let sx, sy, sw, sh;
 
-    // 3. Draw Text
-    // Title
-    drawTextWithDynamicSize(ctx, title, {
-        x: 200, y: SLIDE_HEIGHT / 2 - 150,
-        maxWidth: SLIDE_WIDTH - 400, maxHeight: 300,
-        initialFontSize: 96, minFontSize: 48,
-        lineHeightRatio: 1.15,
-        weight: 'bold', color: '#ffffff', align: 'center'
-    });
+    if (sAspect > dAspect) { // source is wider, crop sides
+        sh = sHeight;
+        sw = sh * dAspect;
+        sx = (sWidth - sw) / 2;
+        sy = 0;
+    } else { // source is taller or same, crop top/bottom
+        sw = sWidth;
+        sh = sw / dAspect;
+        sx = 0;
+        sy = (sHeight - sh) / 2;
+    }
+    ctx.drawImage(image, sx, sy, sw, sh, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
+
+async function drawTitleSlide(ctx: CanvasRenderingContext2D, text: PresentationText, style: string, theme: ColorTheme, scenes: GeneratedScene[]) {
+    ctx.fillStyle = theme.colors.background;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    if (scenes.length > 0) {
+        const image = await loadImage(scenes[0].url);
+        drawFullBleedImage(ctx, image);
+    }
     
-    // Subtitle
-    ctx.font = `60px ${FONT_FAMILY}`;
-    ctx.fillStyle = '#e5e7eb';
+    ctx.fillStyle = theme.colors.titleBackground;
+    ctx.fillRect(0, BANNER_Y, CANVAS_WIDTH, BANNER_HEIGHT);
+
     ctx.textAlign = 'center';
-    ctx.fillText(getTranslation('slideSubtitle', language), SLIDE_WIDTH / 2, SLIDE_HEIGHT / 2 + 100);
-
-    // Footer
-    ctx.font = `32px ${FONT_FAMILY}`;
-    ctx.fillStyle = theme.slideFooter;
-    ctx.fillText(getTranslation('slideFooter', language), SLIDE_WIDTH / 2, SLIDE_HEIGHT - 80);
-}
-
-function drawConceptSlide(ctx: CanvasRenderingContext2D, planImage: HTMLImageElement, concepts: string[], language: Language, theme: ColorTheme) {
-    // Background
-    ctx.fillStyle = theme.background;
-    ctx.fillRect(0, 0, SLIDE_WIDTH, SLIDE_HEIGHT);
-
-    // Title
-    ctx.fillStyle = theme.titleText;
-    ctx.textAlign = 'left';
-    ctx.font = `bold 72px ${FONT_FAMILY}`;
-    ctx.fillText(getTranslation('slideConceptsTitle', language), 100, 150);
-
-    // Draw Floor Plan Image
-    const imageAspectRatio = planImage.width / planImage.height;
-    const imageMaxWidth = SLIDE_WIDTH / 2 - 150;
-    const imageMaxHeight = SLIDE_HEIGHT - 300;
-    let imgW = imageMaxWidth;
-    let imgH = imgW / imageAspectRatio;
-    if (imgH > imageMaxHeight) {
-        imgH = imageMaxHeight;
-        imgW = imgH * imageAspectRatio;
-    }
-    const imgX = SLIDE_WIDTH - imgW - 100;
-    const imgY = (SLIDE_HEIGHT - imgH) / 2 + 50;
-    ctx.save();
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-    ctx.shadowBlur = 30;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 10;
-    ctx.drawImage(planImage, imgX, imgY, imgW, imgH);
-    ctx.restore();
-
-    // Draw Concepts
-    const availableHeight = SLIDE_HEIGHT - 350;
-    const conceptSpacing = availableHeight / Math.max(1, concepts.length);
-    let conceptY = 280;
-
-    concepts.forEach((concept) => {
-        const parts = concept.split(':');
-        const conceptTitle = parts[0] + ':';
-        const conceptDesc = parts.slice(1).join(':').trim();
-
-        drawTextWithDynamicSize(ctx, conceptTitle, {
-            x: 120, y: conceptY,
-            maxWidth: 650, maxHeight: conceptSpacing * 0.4,
-            initialFontSize: 48, minFontSize: 24,
-            lineHeightRatio: 1.2,
-            weight: 'bold', color: theme.accent
-        });
-        
-        drawTextWithDynamicSize(ctx, conceptDesc, {
-            x: 120, y: conceptY + 65,
-            maxWidth: 650, maxHeight: conceptSpacing * 0.5,
-            initialFontSize: 36, minFontSize: 20,
-            lineHeightRatio: 1.4,
-            weight: 'normal', color: theme.secondaryText
-        });
-
-        conceptY += conceptSpacing;
-    });
-}
-
-
-function drawViewpointSlide(ctx: CanvasRenderingContext2D, sceneImage: HTMLImageElement, title: string, description: string, theme: ColorTheme) {
-    // Background - use image as full bleed background
-    const imageAspectRatio = sceneImage.width / sceneImage.height;
-    const slideAspectRatio = SLIDE_WIDTH / SLIDE_HEIGHT;
-    let sx = 0, sy = 0, sWidth = sceneImage.width, sHeight = sceneImage.height;
-
-    if (imageAspectRatio > slideAspectRatio) {
-        sWidth = sceneImage.height * slideAspectRatio;
-        sx = (sceneImage.width - sWidth) / 2;
-    } else {
-        sHeight = sceneImage.width / slideAspectRatio;
-        sy = (sceneImage.height - sHeight) / 2;
-    }
-    ctx.drawImage(sceneImage, sx, sy, sWidth, sHeight, 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT);
-
-    // Text Overlay Box
-    const boxHeight = 400;
-    const gradient = ctx.createLinearGradient(0, SLIDE_HEIGHT - boxHeight, 0, SLIDE_HEIGHT);
-    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(0.2, 'rgba(0, 0, 0, 0.6)');
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, SLIDE_HEIGHT - boxHeight, SLIDE_WIDTH, boxHeight);
-
-    // Text
-    drawTextWithDynamicSize(ctx, title, {
-        x: 80, y: SLIDE_HEIGHT - 300,
-        maxWidth: SLIDE_WIDTH - 160, maxHeight: 120,
-        initialFontSize: 72, minFontSize: 36,
-        lineHeightRatio: 1.2,
-        weight: 'bold', color: '#ffffff'
-    });
-
-    drawTextWithDynamicSize(ctx, description, {
-        x: 80, y: SLIDE_HEIGHT - 180,
-        maxWidth: SLIDE_WIDTH - 160, maxHeight: 150,
-        initialFontSize: 40, minFontSize: 24,
-        lineHeightRatio: 1.4,
-        weight: 'normal', color: '#e5e7eb'
-    });
-}
-
-
-function drawConclusionSlide(ctx: CanvasRenderingContext2D, conclusionImage: HTMLImageElement, conclusion: string, language: Language, theme: ColorTheme) {
-    // Draw background image on the left half
-    const imageWidth = SLIDE_WIDTH * 0.55;
-    const imageAspectRatio = conclusionImage.width / conclusionImage.height;
-    const slideHeightAspectRatio = imageWidth / SLIDE_HEIGHT;
-    let sx = 0, sy = 0, sWidth = conclusionImage.width, sHeight = conclusionImage.height;
-    if (imageAspectRatio > slideHeightAspectRatio) {
-        sWidth = conclusionImage.height * slideHeightAspectRatio;
-        sx = (conclusionImage.width - sWidth) / 2;
-    } else {
-        sHeight = conclusionImage.width / slideHeightAspectRatio;
-        sy = (conclusionImage.height - sHeight) / 2;
-    }
-    ctx.drawImage(conclusionImage, sx, sy, sWidth, sHeight, 0, 0, imageWidth, SLIDE_HEIGHT);
-
-    // Draw colored panel on the right half
-    ctx.fillStyle = theme.background;
-    ctx.fillRect(imageWidth, 0, SLIDE_WIDTH - imageWidth, SLIDE_HEIGHT);
+    ctx.textBaseline = 'middle';
     
-    // Draw content on the right panel
-    const textX = imageWidth + 80;
-    const textMaxWidth = SLIDE_WIDTH - imageWidth - 160;
-
-    // Title
-    ctx.fillStyle = theme.accent;
-    ctx.textAlign = 'left';
-    ctx.font = `bold 96px ${FONT_FAMILY}`;
-    ctx.fillText(getTranslation('slideConclusionTitle', language), textX, 250);
-
-    // Text
-    drawTextWithDynamicSize(ctx, conclusion, {
-        x: textX, y: 420,
-        maxWidth: textMaxWidth, maxHeight: SLIDE_HEIGHT - 550,
-        initialFontSize: 42, minFontSize: 24,
-        lineHeightRatio: 1.6,
-        weight: 'normal', color: theme.primaryText
-    });
+    ctx.fillStyle = theme.colors.primaryText;
+    const title = text.presentationTitle;
+    const titleFont = `bold 100px sans-serif`;
+    drawTextWithAutoSize(ctx, title, CANVAS_WIDTH / 2, BANNER_Y + BANNER_HEIGHT / 2, CANVAS_WIDTH - BANNER_PADDING * 2, 220, titleFont, 120, 'center');
 }
 
-export async function createPresentationSlides(
-    planImageSrc: string,
-    scenes: GeneratedScene[],
+
+async function drawConceptSlide(ctx: CanvasRenderingContext2D, text: PresentationText, planImageSrc: string, theme: ColorTheme) {
+    ctx.fillStyle = theme.colors.background;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const planImage = await loadImage(planImageSrc);
+    drawFullBleedImage(ctx, planImage);
+
+    ctx.fillStyle = theme.colors.titleBackground;
+    ctx.fillRect(0, BANNER_Y, CANVAS_WIDTH, BANNER_HEIGHT);
+
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+
+    const concepts = text.mainConcepts.join('\n\n');
+    const conceptsFont = '48px sans-serif';
+    ctx.fillStyle = theme.colors.secondaryText;
+    drawTextWithAutoSize(ctx, concepts, BANNER_PADDING, BANNER_Y + PADDING, CANVAS_WIDTH - BANNER_PADDING * 2, BANNER_HEIGHT - PADDING * 2, conceptsFont, 65, 'left');
+}
+
+
+async function drawViewpointSlide(ctx: CanvasRenderingContext2D, scene: GeneratedScene, detail: PresentationText['viewpointDetails'][0], theme: ColorTheme) {
+    ctx.fillStyle = theme.colors.background;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const image = await loadImage(scene.url);
+    drawFullBleedImage(ctx, image);
+    
+    ctx.fillStyle = theme.colors.titleBackground;
+    ctx.fillRect(0, BANNER_Y, CANVAS_WIDTH, BANNER_HEIGHT);
+    
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    
+    ctx.fillStyle = theme.colors.primaryText;
+    const titleText = detail.title;
+    const titleFont = 'bold 70px sans-serif';
+    drawTextWithAutoSize(ctx, titleText, BANNER_PADDING, BANNER_Y + PADDING, CANVAS_WIDTH - BANNER_PADDING * 2, 120, titleFont, 80, 'left');
+
+    ctx.fillStyle = theme.colors.secondaryText;
+    const descFont = '40px sans-serif';
+    drawTextWithAutoSize(ctx, detail.description, BANNER_PADDING, BANNER_Y + PADDING + 120, CANVAS_WIDTH - BANNER_PADDING * 2, BANNER_HEIGHT - PADDING * 2 - 120, descFont, 50, 'left');
+}
+
+
+async function drawConclusionSlide(ctx: CanvasRenderingContext2D, text: PresentationText, scenes: GeneratedScene[], theme: ColorTheme) {
+    ctx.fillStyle = theme.colors.background;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    if (scenes.length > 0) {
+        const image = await loadImage(scenes[scenes.length - 1].url);
+        drawFullBleedImage(ctx, image);
+    }
+    
+    ctx.fillStyle = theme.colors.titleBackground;
+    ctx.fillRect(0, BANNER_Y, CANVAS_WIDTH, BANNER_HEIGHT);
+    
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    ctx.fillStyle = theme.colors.primaryText;
+    ctx.font = 'bold 80px sans-serif';
+    ctx.fillText(text.conclusionTitle, CANVAS_WIDTH / 2, BANNER_Y + BANNER_HEIGHT / 2 - 80);
+
+    ctx.fillStyle = theme.colors.secondaryText;
+    const conclusionFont = '48px sans-serif';
+    drawTextWithAutoSize(ctx, text.conclusion, CANVAS_WIDTH / 2, BANNER_Y + BANNER_HEIGHT / 2 + 40, CANVAS_WIDTH - BANNER_PADDING * 2, 200, conclusionFont, 60, 'center');
+}
+
+
+export async function generateSlides(
     text: PresentationText,
+    scenes: GeneratedScene[],
+    planImage: string,
+    style: string,
     language: Language,
     theme: ColorTheme
 ): Promise<string[]> {
-    const imageUrls = [planImageSrc, ...scenes.map(s => s.url)];
-    const [planImage, ...sceneImages] = await loadImages(imageUrls);
+    const slideGenerators = [
+        (ctx: CanvasRenderingContext2D) => drawTitleSlide(ctx, text, style, theme, scenes),
+        (ctx: CanvasRenderingContext2D) => drawConceptSlide(ctx, text, planImage, theme),
+        ...scenes.map((scene, i) => (ctx: CanvasRenderingContext2D) => drawViewpointSlide(ctx, scene, text.viewpointDetails[i], theme)),
+        (ctx: CanvasRenderingContext2D) => drawConclusionSlide(ctx, text, scenes, theme),
+    ];
 
-    const slides: string[] = [];
+    const dataUrls: string[] = [];
 
-    const createCanvas = () => {
+    for (const generate of slideGenerators) {
         const canvas = document.createElement('canvas');
-        canvas.width = SLIDE_WIDTH;
-        canvas.height = SLIDE_HEIGHT;
-        return canvas;
-    };
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not create canvas context');
+        
+        await generate(ctx);
+        dataUrls.push(canvas.toDataURL('image/png'));
+    }
 
-    // Slide 1: Title
-    let canvas = createCanvas();
-    let ctx = canvas.getContext('2d')!;
-    drawTitleSlide(ctx, text.presentationTitle, sceneImages, language, theme);
-    slides.push(canvas.toDataURL('image/png'));
-    
-    // Slide 2: Concepts
-    canvas = createCanvas();
-    ctx = canvas.getContext('2d')!;
-    drawConceptSlide(ctx, planImage, text.mainConcepts, language, theme);
-    slides.push(canvas.toDataURL('image/png'));
-
-    // Slides 3+: Viewpoints
-    scenes.forEach((scene, index) => {
-        canvas = createCanvas();
-        ctx = canvas.getContext('2d')!;
-        const details = text.viewpointDetails[index] || { title: `Viewpoint ${scene.viewIndex}`, description: "This viewpoint showcases the blend of functionality and style." };
-        drawViewpointSlide(ctx, sceneImages[index], details.title, details.description, theme);
-        slides.push(canvas.toDataURL('image/png'));
-    });
-
-    // Final Slide: Conclusion
-    canvas = createCanvas();
-    ctx = canvas.getContext('2d')!;
-    const conclusionImage = sceneImages[0] || planImage;
-    drawConclusionSlide(ctx, conclusionImage, text.conclusion, language, theme);
-    slides.push(canvas.toDataURL('image/png'));
-
-    return slides;
+    return dataUrls;
 }

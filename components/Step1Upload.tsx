@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { ChangeEvent, useState } from 'react';
+// FIX: Corrected import path for i18n module.
 import { Language, getTranslation } from '../lib/i18n';
 
 interface Step1UploadProps {

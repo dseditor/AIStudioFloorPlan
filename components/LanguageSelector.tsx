@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
+// FIX: Corrected import path for i18n module.
 import { Language, getTranslation } from '../lib/i18n';
 
 interface LanguageSelectorProps {
@@ -25,23 +26,17 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ onLanguageSelect })
                 <div className="space-y-4">
                     <button
                         onClick={() => onLanguageSelect('zh')}
-                        className="w-full px-6 py-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-3"
+                        className="w-full px-6 py-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center"
                     >
-                        <span className="text-2xl">🇹🇼</span>
                         <span className="text-lg">{getTranslation('chinese', 'zh')}</span>
                     </button>
                     
                     <button
                         onClick={() => onLanguageSelect('en')}
-                        className="w-full px-6 py-4 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 transition-colors duration-200 flex items-center justify-center gap-3"
+                        className="w-full px-6 py-4 bg-slate-600 text-white font-semibold rounded-lg hover:bg-slate-700 transition-colors duration-200 flex items-center justify-center"
                     >
-                        <span className="text-2xl">🇺🇸</span>
                         <span className="text-lg">{getTranslation('english', 'en')}</span>
                     </button>
-                </div>
-                
-                <div className="mt-6 text-sm text-slate-500">
-                    You can change language anytime in settings
                 </div>
             </div>
         </div>

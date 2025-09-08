@@ -9,15 +9,16 @@ import { Language, getTranslation } from '../lib/i18n';
 import type { GeneratedScene } from './Step3SceneGeneration';
 import EditSlideModal, { SlideData } from './EditSlideModal';
 import JSZip from 'jszip';
+import AnimatedSlideshow from './AnimatedSlideshow';
 
-interface Step4PresentationProps {
+interface Step5PresentationProps {
     finalPlanImage: string;
     generatedScenes: GeneratedScene[];
     style: string;
     language: Language;
 }
 
-const Step4Presentation: React.FC<Step4PresentationProps> = ({ finalPlanImage, generatedScenes, style, language }) => {
+const Step5Presentation: React.FC<Step5PresentationProps> = ({ finalPlanImage, generatedScenes, style, language }) => {
     const [presentationText, setPresentationText] = useState<PresentationText | null>(null);
     const [slideImages, setSlideImages] = useState<string[]>([]);
     const [isLoadingText, setIsLoadingText] = useState(true);
@@ -26,6 +27,7 @@ const Step4Presentation: React.FC<Step4PresentationProps> = ({ finalPlanImage, g
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSlide, setEditingSlide] = useState<SlideData | null>(null);
     const [selectedTheme, setSelectedTheme] = useState<ColorTheme>(themes[0]);
+    const [showSlideshow, setShowSlideshow] = useState(false);
 
     // FIX: Memoize `completedScenes` to prevent it from being a new array on every render.
     // This was causing an infinite loop because it was a dependency of `regenerateAllSlides`.
@@ -181,10 +183,10 @@ const Step4Presentation: React.FC<Step4PresentationProps> = ({ finalPlanImage, g
         <div className="w-full max-w-7xl mx-auto space-y-10">
             <div>
                 <h2 className="text-3xl font-bold mb-2 text-center text-slate-900">
-                    {getTranslation('step4Title', language)}
+                    {getTranslation('step5Title', language)}
                 </h2>
                 <p className="text-center text-slate-500 mb-8 max-w-2xl mx-auto">
-                    {getTranslation('step4Description', language)}
+                    {getTranslation('step5Description', language)}
                 </p>
             </div>
 
@@ -247,7 +249,14 @@ const Step4Presentation: React.FC<Step4PresentationProps> = ({ finalPlanImage, g
             <div className="p-6 bg-slate-50 rounded-xl border border-slate-200">
                 <h3 className="text-xl font-bold text-slate-800 mb-2">{getTranslation('downloadStep', language)}</h3>
                 <p className="text-slate-600 mb-6">{getTranslation('downloadStepDescription', language)}</p>
-                <div className="text-center">
+                <div className="text-center flex flex-wrap justify-center gap-4">
+                    <button 
+                        onClick={() => setShowSlideshow(true)}
+                        disabled={slideImages.length === 0 || isGeneratingSlides}
+                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {getTranslation('viewSlideshow', language)}
+                    </button>
                     <button 
                         onClick={handleDownload}
                         disabled={slideImages.length === 0 || isGeneratingSlides}
@@ -265,8 +274,15 @@ const Step4Presentation: React.FC<Step4PresentationProps> = ({ finalPlanImage, g
                 onSave={handleSave}
                 language={language}
             />
+
+            <AnimatedSlideshow 
+                isOpen={showSlideshow}
+                slides={slideImages}
+                onClose={() => setShowSlideshow(false)}
+                language={language}
+            />
         </div>
     );
 };
 
-export default Step4Presentation;
+export default Step5Presentation;

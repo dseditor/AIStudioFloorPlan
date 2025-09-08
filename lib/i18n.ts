@@ -3,301 +3,147 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Language = 'zh' | 'en';
+export type Language = 'en' | 'zh';
 
-export interface Translations {
-    // App Level
-    appTitle: string;
-    appSubtitle: string;
-    
-    // Language Selection
-    selectLanguage: string;
-    chinese: string;
-    english: string;
-    
-    // Navigation
-    previousStep: string;
-    nextStep: string;
-    restart: string;
-    
-    // Step Labels
-    stepUpload: string;
-    stepRendering: string;
-    stepGeneration: string;
-    stepPresentation: string;
+type Translations = {
+    [key: string]: {
+        en: string;
+        zh: string;
+    };
+};
 
-    // Step 1 - Upload
-    step1Title: string;
-    step1Description: string;
-    uploadPlaceholder: string;
-    uploadButton: string;
-    reuploadButton: string;
-    analyzingIndicator: string;
+// FIX: Removed the `: Translations` type annotation to allow TypeScript to infer a
+// more specific type for the object keys. This makes `keyof typeof translations` a
+// union of string literals, resolving the type error in `getTranslation`.
+const translations = {
+    // App.tsx
+    appTitle: { en: 'Floor Plan Wizard', zh: '平面圖魔法師' },
+    appSubtitle: { en: 'Transform Floor Plans into Photorealistic Renders and Professional Presentations', zh: '從平面圖到照片級渲染與簡報製作' },
+    previousStep: { en: 'Previous Step', zh: '上一步' },
+    nextStep: { en: 'Next Step', zh: '下一步' },
+    restart: { en: 'Start Over', zh: '重新開始' },
     
-    // Step 2 - Rendering
-    step2Title: string;
-    step2Description: string;
-    originalPlanReference: string;
-    aiRenderingArea: string;
-    pleaseUploadFirst: string;
-    startAIRendering: string;
-    aiGenerating: string;
-    renderingFailed: string;
-    confirmRenderingTitle: string;
-    confirmRenderingDescription: string;
-    acceptRendering: string;
-    regenerateRendering: string;
-    correctionInputLabel: string;
-    correctionInputPlaceholder: string;
-    submitCorrection: string;
-    autoMaterial: string;
-    restore: string;
-    clearMask: string;
-    downloadImage: string;
-    enterCorrectionAlert: string;
-    markAreaAlert: string;
-    correctionFailed: string;
-    autoMaterialFailed: string;
-    
-    // Step 3 - Scene Generation
-    step3Title: string;
-    step3Description: string;
-    maxViewpointsAlert: string;
-    styleInputPlaceholder: string;
-    suggestStyleButton: string;
-    suggestingStyle: string;
-    styleSuggestionFailed: string;
-    generateScenes: string;
-    generating: string;
-    clearViewpoints: string;
-    downloadAllZip: string;
-    enterStyleAlert: string;
-    selectViewpointAlert: string;
-    generateScenesFirst: string;
-    viewpoint: string;
-    generationFailed: string;
-    retry: string;
-    downloadFailed: string;
+    // Stepper.tsx
+    stepUpload: { en: 'Upload', zh: '上傳' },
+    stepRendering: { en: 'Rendering', zh: '渲染' },
+    stepGeneration: { en: 'Generation', zh: '生成' },
+    step4SceneEditing: { en: 'Edit Scenes', zh: '編輯場景' },
+    step5Presentation: { en: 'Presentation', zh: '簡報' },
 
-    // Step 4 - Presentation
-    step4Title: string;
-    step4Description: string;
-    generatePresentation: string;
-    generatingPresentation: string;
-    presentationReady: string;
-    downloadPresentation: string;
-    presentationSlide: string;
-    presentationGenerationFailed: string;
-    presentationLanguage: string;
-    presentationTheme: string;
-    themeModernBlue: string;
-    themeWarmEarth: string;
-    themeMinimalistGray: string;
-    themeBoldTeal: string;
-    // Static text for slides
-    slideSubtitle: string;
-    slideConceptsTitle: string;
-    slideConclusionTitle: string;
-    slideFooter: string;
+    // LanguageSelector.tsx
+    selectLanguage: { en: 'Select Language', zh: '選擇語言' },
+    chinese: { en: 'Traditional Chinese', zh: '繁體中文' },
+    english: { en: 'English', zh: '英文' },
+
+    // Step1Upload.tsx
+    step1Title: { en: 'Step 1: Upload Your Floor Plan', zh: '步驟 1：上傳您的平面圖' },
+    step1Description: { en: 'Upload a clear image of your floor plan. The AI will analyze the layout to begin the design process.', zh: '上傳清晰的平面圖照片。AI 將分析佈局以開始設計流程。' },
+    uploadPlaceholder: { en: 'Your floor plan image will appear here', zh: '您的平面圖將會顯示在這裡' },
+    uploadButton: { en: 'Select Floor Plan', zh: '選擇平面圖' },
+    reuploadButton: { en: 'Select a Different Plan', zh: '選擇其他平面圖' },
+    analyzingIndicator: { en: 'Analyzing floor plan...', zh: '正在分析平面圖...' },
+
+    // Step2Rendering.tsx
+    step2Title: { en: 'Step 2: Clean & Render Floor Plan', zh: '步驟 2：清理並渲染平面圖' },
+    step2Description: { en: 'The AI will remove text and annotations, then create a clean 3D top-down rendering. You can make corrections if needed.', zh: 'AI 將移除文字和標註，並生成乾淨的 3D 俯視渲染圖。如果需要，您可以進行修正。' },
+    originalPlanReference: { en: 'Original Plan Reference', zh: '原始平面圖參考' },
+    pleaseUploadFirst: { en: 'Please upload a plan first', zh: '請先上傳平面圖' },
+    aiRenderingArea: { en: 'AI Rendering Area', zh: 'AI 渲染區' },
+    aiGenerating: { en: 'AI is generating...', zh: 'AI 生成中...' },
+    startAIRendering: { en: 'Start AI Rendering', zh: '開始 AI 渲染' },
+    renderingFailed: { en: 'AI rendering failed. Please try again.', zh: 'AI 渲染失敗，請重試。' },
+    confirmRenderingTitle: { en: 'Confirm Rendering', zh: '確認渲染圖' },
+    confirmRenderingDescription: { en: 'Does this rendering accurately represent your floor plan? You can accept it to continue, or regenerate if there are issues.', zh: '此渲染圖是否準確呈現您的平面圖？您可以接受以繼續，或在有問題時重新生成。' },
+    acceptRendering: { en: 'Looks Good, Continue', zh: '看起來不錯，繼續' },
+    regenerateRendering: { en: 'Regenerate', zh: '重新生成' },
+    correctionInputLabel: { en: 'Make Corrections: Describe the change. For targeted edits, you can also mark an area on the image.', zh: '進行修正：描述您想做的更改。若要針對特定區域編輯，也可以先在圖片上標示該區域。' },
+    correctionInputPlaceholder: { en: 'e.g., "add a window here", "remove this wall"', zh: '例如：「在這裡加一扇窗」、「移除這面牆」' },
+    submitCorrection: { en: 'Submit Correction', zh: '提交修正' },
+    autoMaterial: { en: 'Apply Auto-Materials', zh: '自動應用材質' },
+    restore: { en: 'Undo', zh: '復原' },
+    clearMask: { en: 'Clear Selection', zh: '清除選取' },
+    downloadImage: { en: 'Download', zh: '下載' },
+    enterCorrectionAlert: { en: 'Please enter a correction instruction.', zh: '請輸入修正指令。' },
+    correctionFailed: { en: 'Failed to apply correction. Please try again.', zh: '修正失敗，請重試。' },
+    autoMaterialFailed: { en: 'Failed to apply auto-materials. Please try again.', zh: '自動應用材質失敗，請重試。' },
+    suggestImprovement: { en: 'AI Suggestion', zh: 'AI 建議' },
+    suggestingImprovement: { en: 'Suggesting...', zh: '建議中...' },
+    suggestionFailed: { en: 'Failed to get suggestion. Please try again.', zh: '建議失敗，請重試。' },
+
+    // Step3SceneGeneration.tsx
+    step3Title: { en: 'Step 3: Generate Interior Scenes', zh: '步驟 3：生成室內場景' },
+    step3Description: { en: 'Select viewpoints on the plan and choose a design style. The AI will generate photorealistic scenes from those perspectives.', zh: '在平面圖上選擇視角並選擇設計風格。AI 將從這些視角生成照片級場景。' },
+    maxViewpointsAlert: { en: 'You can select a maximum of 8 viewpoints.', zh: '您最多可以選擇 8 個視角。' },
+    styleInputPlaceholder: { en: 'Enter a style (e.g., Modern Minimalist)', zh: '輸入風格（例如：現代極簡）' },
+    suggestStyleButton: { en: 'Suggest a Style', zh: '建議風格' },
+    suggestingStyle: { en: 'Suggesting...', zh: '建議中...' },
+    styleSuggestionFailed: { en: 'Failed to suggest a style. Please enter one manually.', zh: '風格建議失敗，請手動輸入。' },
+    generateScenes: { en: 'Generate Scenes', zh: '生成場景' },
+    generating: { en: 'Generating...', zh: '生成中...' },
+    clearViewpoints: { en: 'Clear Viewpoints', zh: '清除視角' },
+    downloadAllZip: { en: 'Download All (.zip)', zh: '全部下載 (.zip)' },
+    viewpoint: { en: 'Viewpoint', zh: '視角' },
+    generationFailed: { en: 'Failed', zh: '生成失敗' },
+    retry: { en: 'Retry', zh: '重試' },
+    enterStyleAlert: { en: 'Please enter an interior design style.', zh: '請輸入室內設計風格。' },
+    selectViewpointAlert: { en: 'Please select at least one viewpoint on the floor plan.', zh: '請在平面圖上至少選擇一個視角。' },
+    generateScenesFirst: { en: 'Please generate scenes before downloading.', zh: '請在下載前先生成場景。' },
+    downloadFailed: { en: 'Download failed. Please try again.', zh: '下載失敗，請重試。' },
+    selectStyle: { en: 'Or select a style below:', zh: '或選擇下方的風格：' },
+    loadingStyleIdeas: { en: 'Loading style ideas...', zh: '正在載入風格靈感...' },
+
+    // Step4SceneEditing.tsx
+    step4Title: { en: 'Step 4: Edit & Refine Scenes', zh: '步驟 4：編輯與優化場景' },
+    step4Description: { en: 'Fine-tune your scenes here. Please note: content editing and lighting adjustments are separate steps. First, use a text prompt to modify content and click "Apply". Once that is done, you can adjust the lighting and click "Apply" again.', zh: '在此微調您的場景。請注意：內容編輯與燈光調整是分開的步驟。請先使用提示詞修改內容並點擊「套用」，完成後再調整燈光並再次點擊「套用」。' },
+    editPromptPlaceholder: { en: 'e.g., "make the sofa blue", "add this chair"', zh: '例如：「把沙發換成藍色」、「加入這張椅子」' },
+    applyEdit: { en: 'Apply', zh: '套用' },
+    restoreOriginal: { en: 'Restore Original', zh: '還原原始圖' },
+    updatingScene: { en: 'Updating scene...', zh: '正在更新場景...' },
+    downloadEditedScenes: { en: 'Download All (.zip)', zh: '全部下載 (.zip)' },
+    addObject: { en: 'Add Object', zh: '新增物件' },
+    clearObject: { en: 'Clear Object', zh: '清除物件' },
+
+    // Step5Presentation.tsx (was Step4)
+    step5Title: { en: 'Step 5: Finalize Your Design Presentation', zh: '步驟 5：完成您的設計簡報' },
+    step5Description: { en: 'Follow the steps below to customize and download your presentation. You can edit text on any slide.', zh: '依照以下步驟來自訂和下載您的簡報。您可以編輯任何投影片上的文字。' },
+    generatingPresentation: { en: 'Generating presentation...', zh: '正在生成簡報...' },
+    presentationFailed: { en: 'Failed to generate presentation. Please try again.', zh: '簡報生成失敗，請重試。' },
+    downloadPresentation: { en: 'Download Presentation (.zip)', zh: '下載簡報 (.zip)' },
+    viewSlideshow: { en: 'View Slideshow', zh: '檢視簡報' },
+    editSlide: { en: 'Edit Text', zh: '編輯文字' },
+    customizeTheme: { en: '1. Customize Theme', zh: '1. 選擇版型配色' },
+    presentationTheme: { en: 'Presentation Theme', zh: '簡報主題' },
+    themeModernBlue: { en: 'Modern Blue', zh: '現代藍' },
+    themeEarthTones: { en: 'Earth Tones', zh: '大地色' },
+    themeMinimalistGray: { en: 'Minimalist Gray', zh: '簡約灰' },
+    themeVibrantCreative: { en: 'Vibrant Creative', zh: '活力創意' },
+    themeElegantNoir: { en: 'Elegant Noir', zh: '優雅黑' },
+    themeSakuraPink: { en: 'Sakura Pink', zh: '櫻花粉' },
+    editContent: { en: '2. Edit Content', zh: '2. 編輯文字' },
+    editContentDescription: { en: 'Click the edit button on any slide to modify its text.', zh: '點擊任一張投影片上的編輯按鈕來修改文字。' },
+    downloadStep: { en: '3. Download', zh: '3. 儲存簡報' },
+    downloadStepDescription: { en: 'Download all slides as high-resolution images in a ZIP file.', zh: '將所有投影片下載為高解析度圖片的 ZIP 檔案。' },
+    generatingSlides: { en: 'Generating slides...', zh: '正在生成投影片...' },
+
+    // EditSlideModal.tsx
+    editSlideTitle: { en: 'Edit Slide Content', zh: '編輯投影片內容' },
+    title: { en: 'Title', zh: '標題' },
+    description: { en: 'Description', zh: '描述' },
+    concept: { en: 'Concept', zh: '設計理念' },
+    conclusion: { en: 'Conclusion', zh: '結語' },
+    saveChanges: { en: 'Save Changes', zh: '儲存變更' },
+    cancel: { en: 'Cancel', zh: '取消' },
+
+    // AnimatedSlideshow.tsx
+    closeSlideshow: { en: 'Close', zh: '關閉' },
+
+    // InteractiveSceneModal.tsx & Step4SceneEditing.tsx
+    day: { en: 'Day', zh: '白天' },
+    night: { en: 'Night', zh: '夜晚' },
+    colorTemperature: { en: 'Color Temperature', zh: '色溫' },
+    updatingLighting: { en: 'Updating lighting...', zh: '正在更新燈光...' },
+};
+
+export function getTranslation(key: keyof typeof translations, language: Language): string {
+    return translations[key] ? translations[key][language] : key;
 }
-
-const zhTranslations: Translations = {
-    // App Level
-    appTitle: '平面圖 AI 視覺化編輯器',
-    appSubtitle: '將 2D 平面圖轉換、編輯並生成擬真實景圖',
-    
-    // Language Selection
-    selectLanguage: '選擇語言 / Select Language',
-    chinese: '中文',
-    english: 'English',
-    
-    // Navigation
-    previousStep: '上一步',
-    nextStep: '下一步',
-    restart: '重新開始',
-    
-    // Step Labels
-    stepUpload: '上傳與分析',
-    stepRendering: 'AI 渲染與編輯',
-    stepGeneration: '生成室內實景',
-    stepPresentation: '製作簡報',
-    
-    // Step 1 - Upload
-    step1Title: '步驟 1: 上傳與分析平面圖',
-    step1Description: '請上傳您的平面圖。系統將模擬自動分析流程，以準備進行 AI 渲染。',
-    uploadPlaceholder: '點擊下方按鈕上傳平面圖',
-    uploadButton: '上傳您的平面圖',
-    reuploadButton: '重新上傳平面圖',
-    analyzingIndicator: '正在進行 AI 分析，請稍候...',
-    
-    // Step 2 - Rendering
-    step2Title: '步驟 2: AI 渲染與編輯',
-    step2Description: 'AI 將生成渲染圖。您可使用畫筆在圖上標示區域，並透過提示詞進行修改。',
-    originalPlanReference: '原始平面圖參考',
-    aiRenderingArea: 'AI 生成與編輯區',
-    pleaseUploadFirst: '請先上傳平面圖',
-    startAIRendering: '開始 AI 渲染',
-    aiGenerating: 'AI 正在生成中...',
-    renderingFailed: 'AI 渲染失敗，請稍後再試。',
-    confirmRenderingTitle: '確認渲染結果',
-    confirmRenderingDescription: '您是否滿意這張 AI 渲染圖？',
-    acceptRendering: '接受，繼續編輯',
-    regenerateRendering: '重新生成',
-    correctionInputLabel: '修正指令輸入框：',
-    correctionInputPlaceholder: '例如：將標示區域改為木質地板...',
-    submitCorrection: '送出指令',
-    autoMaterial: '自動材質',
-    restore: '還原',
-    clearMask: '清除標示',
-    downloadImage: '下載圖片',
-    enterCorrectionAlert: '請輸入修正指令！',
-    markAreaAlert: '請先用畫筆標示要修改的區域！',
-    correctionFailed: '修正失敗，請稍後再試。',
-    autoMaterialFailed: '自動材質應用失敗，請稍後再試。',
-    
-    // Step 3 - Scene Generation
-    step3Title: '步驟 3: 生成室內實景圖',
-    step3Description: '在下方平面圖上點擊最多八個位置作為視角，輸入裝修風格，AI 將生成對應的擬真實景圖。',
-    maxViewpointsAlert: '最多只能選擇八個視角。',
-    styleInputPlaceholder: '輸入裝修風格 (例如: 北歐風、工業風)',
-    suggestStyleButton: 'AI 推薦',
-    suggestingStyle: '推薦中...',
-    styleSuggestionFailed: '風格推薦失敗。',
-    generateScenes: '生成實景圖',
-    generating: '生成中...',
-    clearViewpoints: '清除視角',
-    downloadAllZip: '下載全部 ZIP',
-    enterStyleAlert: '請輸入裝修風格！',
-    selectViewpointAlert: '請至少在地圖上點選一個視角！',
-    generateScenesFirst: '請先生成實景圖！',
-    viewpoint: '視角',
-    generationFailed: '生成失敗',
-    retry: '重試',
-    downloadFailed: '下載失敗，請稍後再試。',
-
-    // Step 4 - Presentation
-    step4Title: '步驟 4: 生成設計簡報',
-    step4Description: 'AI 將根據您的設計風格與視角圖，自動生成一份完整的設計提案簡報。',
-    generatePresentation: '生成設計簡報',
-    generatingPresentation: '正在生成簡報...',
-    presentationReady: '簡報預覽',
-    downloadPresentation: '下載簡報 (ZIP)',
-    presentationSlide: '投影片',
-    presentationGenerationFailed: '簡報生成失敗，請再試一次。',
-    presentationLanguage: '簡報語言',
-    presentationTheme: '簡報主題配色',
-    themeModernBlue: '現代藍',
-    themeWarmEarth: '溫暖大地',
-    themeMinimalistGray: '簡約灰',
-    themeBoldTeal: '大膽青',
-    // Static text for slides
-    slideSubtitle: '室內設計提案',
-    slideConceptsTitle: '設計理念與平面圖',
-    slideConclusionTitle: '總結',
-    slideFooter: '由 FloorPlan AI 生成',
-};
-
-const enTranslations: Translations = {
-    // App Level
-    appTitle: 'Floor Plan AI Visualization Editor',
-    appSubtitle: 'Transform 2D floor plans, edit and generate realistic interior scenes',
-    
-    // Language Selection
-    selectLanguage: '選擇語言 / Select Language',
-    chinese: '中文',
-    english: 'English',
-    
-    // Navigation
-    previousStep: 'Previous',
-    nextStep: 'Next',
-    restart: 'Restart',
-    
-    // Step Labels
-    stepUpload: 'Upload & Analysis',
-    stepRendering: 'AI Rendering & Editing',
-    stepGeneration: 'Interior Scene Generation',
-    stepPresentation: 'Create Presentation',
-    
-    // Step 1 - Upload
-    step1Title: 'Step 1: Upload & Analyze Floor Plan',
-    step1Description: 'Please upload your floor plan. The system will simulate automatic analysis to prepare for AI rendering.',
-    uploadPlaceholder: 'Click the button below to upload your floor plan',
-    uploadButton: 'Upload Your Floor Plan',
-    reuploadButton: 'Re-upload Floor Plan',
-    analyzingIndicator: 'AI analysis in progress, please wait...',
-    
-    // Step 2 - Rendering
-    step2Title: 'Step 2: AI Rendering & Editing',
-    step2Description: 'AI will generate a rendering. You can use the brush to mark areas on the image and modify them through prompts.',
-    originalPlanReference: 'Original Floor Plan Reference',
-    aiRenderingArea: 'AI Generation & Editing Area',
-    pleaseUploadFirst: 'Please upload floor plan first',
-    startAIRendering: 'Start AI Rendering',
-    aiGenerating: 'AI is generating...',
-    renderingFailed: 'AI rendering failed, please try again later.',
-    confirmRenderingTitle: 'Confirm Rendering Result',
-    confirmRenderingDescription: 'Are you satisfied with this AI rendered image?',
-    acceptRendering: 'Accept, Continue Editing',
-    regenerateRendering: 'Regenerate',
-    correctionInputLabel: 'Correction Input:',
-    correctionInputPlaceholder: 'e.g., Change marked area to wooden flooring...',
-    submitCorrection: 'Submit',
-    autoMaterial: 'Auto Material',
-    restore: 'Restore',
-    clearMask: 'Clear Mark',
-    downloadImage: 'Download',
-    enterCorrectionAlert: 'Please enter correction instructions!',
-    markAreaAlert: 'Please mark the area to modify with the brush first!',
-    correctionFailed: 'Correction failed, please try again later.',
-    autoMaterialFailed: 'Auto material application failed, please try again later.',
-    
-    // Step 3 - Scene Generation
-    step3Title: 'Step 3: Generate Interior Scenes',
-    step3Description: 'Click up to eight locations on the floor plan as viewpoints, enter a style, and AI will generate corresponding realistic interior images.',
-    maxViewpointsAlert: 'Maximum eight viewpoints allowed.',
-    styleInputPlaceholder: 'Enter decoration style (e.g., Nordic, Industrial)',
-    suggestStyleButton: 'AI Suggest',
-    suggestingStyle: 'Suggesting...',
-    styleSuggestionFailed: 'Style suggestion failed.',
-    generateScenes: 'Generate Scenes',
-    generating: 'Generating...',
-    clearViewpoints: 'Clear Viewpoints',
-    downloadAllZip: 'Download All ZIP',
-    enterStyleAlert: 'Please enter decoration style!',
-    selectViewpointAlert: 'Please select at least one viewpoint on the map!',
-    generateScenesFirst: 'Please generate scenes first!',
-    viewpoint: 'Viewpoint',
-    generationFailed: 'Generation Failed',
-    retry: 'Retry',
-    downloadFailed: 'Download failed, please try again later.',
-
-    // Step 4 - Presentation
-    step4Title: 'Step 4: Generate Design Presentation',
-    step4Description: 'Based on your design style and viewpoint images, the AI will automatically generate a complete design proposal presentation.',
-    generatePresentation: 'Generate Presentation',
-    generatingPresentation: 'Generating Presentation...',
-    presentationReady: 'Presentation Preview',
-    downloadPresentation: 'Download Presentation (ZIP)',
-    presentationSlide: 'Slide',
-    presentationGenerationFailed: 'Presentation generation failed, please try again.',
-    presentationLanguage: 'Presentation Language',
-    presentationTheme: 'Presentation Theme',
-    themeModernBlue: 'Modern Blue',
-    themeWarmEarth: 'Warm Earth',
-    themeMinimalistGray: 'Minimalist Gray',
-    themeBoldTeal: 'Bold Teal',
-    // Static text for slides
-    slideSubtitle: 'Interior Design Proposal',
-    slideConceptsTitle: 'Design Concepts & Floor Plan',
-    slideConclusionTitle: 'Conclusion',
-    slideFooter: 'Generated with FloorPlan AI',
-};
-
-export const translations = {
-    zh: zhTranslations,
-    en: enTranslations
-};
-
-export const getTranslation = (key: keyof Translations, language: Language): string => {
-    return translations[language][key];
-};

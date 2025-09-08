@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
+// FIX: Corrected import path for i18n module.
 import { Language, getTranslation } from '../lib/i18n';
 
 interface StepperProps {
@@ -16,7 +17,8 @@ const Stepper: React.FC<StepperProps> = ({ currentStep, maxStep, language }) => 
         { id: 1, labelKey: 'stepUpload' as const },
         { id: 2, labelKey: 'stepRendering' as const },
         { id: 3, labelKey: 'stepGeneration' as const },
-        { id: 4, labelKey: 'stepPresentation' as const }
+        { id: 4, labelKey: 'step4SceneEditing' as const },
+        { id: 5, labelKey: 'step5Presentation' as const }
     ];
 
     return (

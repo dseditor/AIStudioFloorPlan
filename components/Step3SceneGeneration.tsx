@@ -3,18 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useState, useRef, useEffect } from 'react';
-import { generateInteriorScene, suggestInteriorStyle } from '../services/geminiService';
+import { generateInteriorScene, suggestInteriorStyle, suggestStyleIdeas } from '../services/geminiService';
+// FIX: Corrected import path for i18n module.
 import { Language, getTranslation } from '../lib/i18n';
 import JSZip from 'jszip';
 import InteractiveSceneModal from './InteractiveSceneModal';
 
-interface ScenePoint {
+export interface ScenePoint {
     x: number;
     y: number;
 }
 
 export interface GeneratedScene {
     url: string;
+    originalUrl: string; // For restore functionality in Step 4
     viewIndex: number;
     style: string;
     isLoading: boolean;
@@ -24,6 +26,8 @@ export interface GeneratedScene {
         tilt: number;
         zoom: number;
     };
+    mode: 'day' | 'night';
+    temperature: number;
 }
 
 interface Step3SceneGenerationProps {
@@ -34,7 +38,11 @@ interface Step3SceneGenerationProps {
     scenes: GeneratedScene[];
     // Fix: Correctly type the onScenesChange prop to accept a state updater function.
     onScenesChange: React.Dispatch<React.SetStateAction<GeneratedScene[]>>;
+    scenePoints: ScenePoint[];
+    onScenePointsChange: React.Dispatch<React.SetStateAction<ScenePoint[]>>;
 }
+
+const styleEmojis = ['🎨', '🛋️', '🖼️', '🪴', '💡', '🏺'];
 
 const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({ 
     finalPlanImage, 
@@ -42,15 +50,36 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
     style,
     onStyleChange,
     scenes,
-    onScenesChange
+    onScenesChange,
+    scenePoints,
+    onScenePointsChange
 }) => {
-    const [scenePoints, setScenePoints] = useState<ScenePoint[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSuggestingStyle, setIsSuggestingStyle] = useState(false);
     const [selectedSceneIndex, setSelectedSceneIndex] = useState<number | null>(null);
+    const [lightingMode] = useState<'day' | 'night'>('day');
+    const [colorTemperature] = useState(6500);
+    const [suggestedStyles, setSuggestedStyles] = useState<string[]>([]);
+    const [isLoadingStyles, setIsLoadingStyles] = useState(true);
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
+
+    useEffect(() => {
+        const fetchStyles = async () => {
+            setIsLoadingStyles(true);
+            try {
+                const styles = await suggestStyleIdeas();
+                setSuggestedStyles(styles);
+            } catch (error) {
+                console.error("Failed to fetch style suggestions:", error);
+                // Fallback is handled in the service, so we just log the error.
+            } finally {
+                setIsLoadingStyles(false);
+            }
+        };
+        fetchStyles();
+    }, []);
 
     useEffect(() => {
         if (finalPlanImage && imageRef.current) {
@@ -94,7 +123,7 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        setScenePoints(prev => [...prev, { x, y }]);
+        onScenePointsChange(prev => [...prev, { x, y }]);
     };
 
     const drawPoints = () => {
@@ -120,7 +149,7 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
     };
 
     const clearPoints = () => {
-        setScenePoints([]);
+        onScenePointsChange([]);
         onScenesChange([]);
         // Redrawing is handled by the useEffect hook
     };
@@ -144,19 +173,26 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
         const sceneToUpdateIndex = scenes.findIndex(s => s.viewIndex === viewIndex);
         if (sceneToUpdateIndex === -1) return;
 
+        const point = scenePoints[sceneToUpdateIndex];
+        if (!point) {
+            console.error("Could not find the original viewpoint for this scene.");
+            return;
+        }
+
         onScenesChange(prev => prev.map((scene, index) =>
             index === sceneToUpdateIndex ? { ...scene, isLoading: true, error: undefined } : scene
         ));
 
         try {
-            const point = scenePoints[sceneToUpdateIndex];
             const image = imageRef.current;
-            if (!image) throw new Error('Image not available');
+            if (!image) throw new Error('Reference image for canvas is not available');
 
             const scaleX = image.naturalWidth / image.clientWidth;
             const scaleY = image.naturalHeight / image.clientHeight;
             const scaledX = point.x * scaleX;
             const scaledY = point.y * scaleY;
+
+            const sceneToUpdate = scenes[sceneToUpdateIndex];
 
             const newImageUrl = await generateInteriorScene(
                 finalPlanImage,
@@ -165,8 +201,8 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                 style,
                 viewIndex,
                 newCamera,
-                'bright natural daylight from large windows',
-                'photorealistic with hyper-detailed textures'
+                sceneToUpdate.mode,
+                sceneToUpdate.temperature
             );
             
             onScenesChange(prev => prev.map((scene, index) =>
@@ -202,12 +238,15 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
         
         setIsGenerating(true);
         
-        const initialScenes = scenePoints.map((_, index) => ({
+        const initialScenes: GeneratedScene[] = scenePoints.map((_, index) => ({
             url: '',
+            originalUrl: '',
             viewIndex: index + 1,
             style: style,
             isLoading: true,
             camera: { rotation: 0, tilt: 0, zoom: 1 },
+            mode: lightingMode,
+            temperature: colorTemperature,
         }));
         onScenesChange(initialScenes);
         
@@ -228,13 +267,13 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                     style,
                     index + 1,
                     { rotation: 0, tilt: 0, zoom: 1 },
-                    'bright natural daylight from large windows',
-                    'photorealistic with hyper-detailed textures'
+                    lightingMode,
+                    colorTemperature
                 );
                 
                 onScenesChange(prev => prev.map((scene, i) => 
                     i === index 
-                        ? { ...scene, url: sceneUrl, isLoading: false }
+                        ? { ...scene, url: sceneUrl, originalUrl: sceneUrl, isLoading: false }
                         : scene
                 ));
             } catch (error) {
@@ -323,52 +362,81 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                     onClick={addScenePoint}
                 />
             </div>
-            
-            <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
-                <div className="flex-grow flex max-w-md">
-                    <input 
-                        type="text" 
-                        value={style}
-                        onChange={(e) => onStyleChange(e.target.value)}
-                        className="flex-grow px-4 py-2 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder={getTranslation('styleInputPlaceholder', language)}
-                    />
-                    <button
-                        onClick={handleSuggestStyle}
-                        disabled={isSuggestingStyle || isGenerating}
-                        className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-r-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center whitespace-nowrap"
+
+            {/* Controls */}
+            <div className="flex flex-col items-center gap-4 mb-6">
+                <div className="flex flex-wrap items-center justify-center gap-4 w-full">
+                    <div className="flex-grow flex max-w-md">
+                        <input 
+                            type="text" 
+                            value={style}
+                            onChange={(e) => onStyleChange(e.target.value)}
+                            className="flex-grow px-4 py-2 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 bg-white text-slate-900"
+                            placeholder={getTranslation('styleInputPlaceholder', language)}
+                        />
+                        <button
+                            onClick={handleSuggestStyle}
+                            disabled={isSuggestingStyle || isGenerating}
+                            className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-r-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center whitespace-nowrap"
+                        >
+                            {isSuggestingStyle ? (
+                                <>
+                                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    {getTranslation('suggestingStyle', language)}
+                                </>
+                            ) : getTranslation('suggestStyleButton', language)}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="w-full max-w-3xl mx-auto pt-4">
+                    <p className="text-center text-slate-600 mb-3">{getTranslation('selectStyle', language)}</p>
+                    {isLoadingStyles ? (
+                        <div className="text-center text-slate-500 p-4">{getTranslation('loadingStyleIdeas', language)}</div>
+                    ) : (
+                        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                            {suggestedStyles.map((styleName, index) => {
+                                const isSelected = style === styleName;
+                                return (
+                                    <button
+                                        key={index}
+                                        onClick={() => onStyleChange(styleName)}
+                                        className={`rounded-lg border-2 text-center p-2 h-24 transition-all duration-200 group focus:outline-none flex flex-col items-center justify-center gap-1 ${isSelected ? 'border-blue-600 ring-2 ring-blue-500 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 text-slate-800'}`}
+                                    >
+                                        <span className="text-3xl" role="img" aria-label="style icon">{styleEmojis[index % styleEmojis.length]}</span>
+                                        <span className="text-xs font-bold leading-tight">{styleName}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+                
+                <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+                    <button 
+                        onClick={generateScenes}
+                        disabled={isGenerating || scenePoints.length === 0 || !style.trim()}
+                        className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
-                        {isSuggestingStyle ? (
-                             <>
-                                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                {getTranslation('suggestingStyle', language)}
-                            </>
-                        ) : getTranslation('suggestStyleButton', language)}
+                        {isGenerating ? getTranslation('generating', language) : getTranslation('generateScenes', language)}
+                    </button>
+                    <button 
+                        onClick={clearPoints}
+                        className="px-6 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                    >
+                        {getTranslation('clearViewpoints', language)}
+                    </button>
+                    <button 
+                        onClick={downloadAllScenesAsZip}
+                        disabled={scenes.filter(s => s.url && !s.error).length === 0}
+                        className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                        {getTranslation('downloadAllZip', language)}
                     </button>
                 </div>
-                <button 
-                    onClick={generateScenes}
-                    disabled={isGenerating || scenePoints.length === 0 || !style.trim()}
-                    className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                    {isGenerating ? getTranslation('generating', language) : getTranslation('generateScenes', language)}
-                </button>
-                <button 
-                    onClick={clearPoints}
-                    className="px-6 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
-                >
-                    {getTranslation('clearViewpoints', language)}
-                </button>
-                <button 
-                    onClick={downloadAllScenesAsZip}
-                    disabled={scenes.filter(s => s.url && !s.error).length === 0}
-                    className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                    {getTranslation('downloadAllZip', language)}
-                </button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

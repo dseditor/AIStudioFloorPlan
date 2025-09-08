@@ -20,65 +20,58 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ imageU
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
-    const [imageLoaded, setImageLoaded] = useState(false);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-
         setContext(ctx);
-        
-        // Load and display the base image
+
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-            // Set canvas size to match image display size
-            const container = containerRef.current;
-            if (container) {
-                const rect = container.getBoundingClientRect();
-                canvas.width = rect.width;
-                canvas.height = rect.height;
-                setImageLoaded(true);
-            }
+            // Set canvas to the native resolution of the image to ensure mask aligns perfectly.
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            // Clear any previous drawings when a new image is loaded.
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         };
         img.src = imageUrl;
     }, [imageUrl]);
 
+    const getScaledCoords = (e: React.PointerEvent<HTMLCanvasElement>): { x: number, y: number } | null => {
+        const canvas = canvasRef.current;
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) * (canvas.width / rect.width),
+            y: (e.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    };
+
     const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!context || !imageLoaded) return;
-        
+        if (!context) return;
+        const coords = getScaledCoords(e);
+        if (!coords) return;
+
         e.preventDefault();
         setIsDrawing(true);
-        
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
         context.beginPath();
-        context.moveTo(x, y);
+        context.moveTo(coords.x, coords.y);
     };
 
     const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (!isDrawing || !context) return;
-        
+        if (!isDrawing || !context || !canvasRef.current) return;
+        const coords = getScaledCoords(e);
+        if (!coords) return;
         e.preventDefault();
-        
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        context.lineTo(x, y);
-        context.strokeStyle = 'rgba(220, 38, 38, 0.6)';
-        context.lineWidth = 15;
+
+        context.lineTo(coords.x, coords.y);
+        // Use a semi-transparent red for user feedback; this won't be in the final mask.
+        context.strokeStyle = 'rgba(220, 38, 38, 0.7)';
+        // Scale brush size relative to image resolution for a consistent feel.
+        context.lineWidth = 30 * (canvasRef.current.width / 1000);
         context.lineCap = 'round';
         context.lineJoin = 'round';
         context.stroke();
@@ -86,36 +79,55 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ imageU
 
     const stopDrawing = () => {
         if (!isDrawing) return;
-        
         setIsDrawing(false);
-        
-        // Notify parent component of mask changes
-        const canvas = canvasRef.current;
-        if (canvas && onMaskChange) {
-            const maskDataUrl = canvas.toDataURL();
-            onMaskChange(maskDataUrl);
+        if (onMaskChange) {
+            onMaskChange(getMaskBase64());
         }
     };
 
     const clearCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas || !context) return;
-        
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        
-        if (onMaskChange) {
-            onMaskChange('');
+        if (context && canvasRef.current) {
+            context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+            if (onMaskChange) {
+                onMaskChange('');
+            }
         }
     };
 
     const getMaskBase64 = (): string => {
         const canvas = canvasRef.current;
         if (!canvas) return '';
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
         
-        return canvas.toDataURL().split(',')[1];
+        // Check if anything has been drawn
+        const isCanvasBlank = !ctx.getImageData(0, 0, canvas.width, canvas.height).data.some(channel => channel !== 0);
+        if (isCanvasBlank) return '';
+
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = canvas.width;
+        maskCanvas.height = canvas.height;
+        const maskCtx = maskCanvas.getContext('2d');
+        if (!maskCtx) return '';
+
+        // Draw the user's marks (which are red and semi-transparent).
+        maskCtx.drawImage(canvas, 0, 0);
+
+        // Use 'source-in' to replace the color of the drawn parts with solid white.
+        // This preserves the shape and anti-aliasing but makes it a solid color.
+        maskCtx.globalCompositeOperation = 'source-in';
+        maskCtx.fillStyle = 'white';
+        maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+        // Use 'destination-over' to draw a black background behind the white shapes.
+        maskCtx.globalCompositeOperation = 'destination-over';
+        maskCtx.fillStyle = 'black';
+        maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+        
+        return maskCanvas.toDataURL('image/png').split(',')[1];
     };
 
-    // Expose methods to parent components
     useImperativeHandle(ref, () => ({
         clearCanvas,
         getMaskBase64
@@ -131,7 +143,7 @@ const DrawingCanvas = forwardRef<DrawingCanvasRef, DrawingCanvasProps>(({ imageU
             />
             <canvas
                 ref={canvasRef}
-                className="absolute top-0 left-0 cursor-crosshair touch-none"
+                className="absolute top-0 left-0 w-full h-full cursor-crosshair touch-none"
                 style={{ touchAction: 'none' }}
                 onPointerDown={startDrawing}
                 onPointerMove={draw}
