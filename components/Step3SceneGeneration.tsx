@@ -154,6 +154,15 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
         // Redrawing is handled by the useEffect hook
     };
 
+    const removeLastViewpoint = () => {
+        if (scenePoints.length === 0) {
+            alert(getTranslation('allViewpointsCleared', language));
+            return;
+        }
+        onScenePointsChange(prev => prev.slice(0, -1));
+        onScenesChange(prev => prev.slice(0, -1));
+    };
+
     const handleSuggestStyle = async () => {
         if (!finalPlanImage) return;
 
@@ -371,7 +380,7 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                             type="text" 
                             value={style}
                             onChange={(e) => onStyleChange(e.target.value)}
-                            className="flex-grow px-4 py-2 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 bg-white text-slate-900"
+                            className="flex-grow px-4 py-2 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-indigo-500 bg-white text-slate-900"
                             placeholder={getTranslation('styleInputPlaceholder', language)}
                         />
                         <button
@@ -404,7 +413,7 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                                     <button
                                         key={index}
                                         onClick={() => onStyleChange(styleName)}
-                                        className={`rounded-lg border-2 text-center p-2 h-24 transition-all duration-200 group focus:outline-none flex flex-col items-center justify-center gap-1 ${isSelected ? 'border-blue-600 ring-2 ring-blue-500 bg-blue-600 text-white' : 'border-slate-300 bg-white hover:border-blue-400 hover:bg-blue-50 text-slate-800'}`}
+                                        className={`rounded-lg border-2 text-center p-2 h-24 transition-all duration-200 group focus:outline-none flex flex-col items-center justify-center gap-1 ${isSelected ? 'border-indigo-600 ring-2 ring-indigo-500 bg-indigo-600 text-white' : 'border-slate-300 bg-white hover:border-indigo-400 hover:bg-indigo-50 text-slate-800'}`}
                                     >
                                         <span className="text-3xl" role="img" aria-label="style icon">{styleEmojis[index % styleEmojis.length]}</span>
                                         <span className="text-xs font-bold leading-tight">{styleName}</span>
@@ -419,13 +428,21 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                     <button 
                         onClick={generateScenes}
                         disabled={isGenerating || scenePoints.length === 0 || !style.trim()}
-                        className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                     >
                         {isGenerating ? getTranslation('generating', language) : getTranslation('generateScenes', language)}
                     </button>
+                    <button
+                        onClick={removeLastViewpoint}
+                        disabled={isGenerating}
+                        className="px-6 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50"
+                    >
+                        {getTranslation('removeLastViewpoint', language)}
+                    </button>
                     <button 
                         onClick={clearPoints}
-                        className="px-6 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors"
+                        disabled={isGenerating}
+                        className="px-6 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50"
                     >
                         {getTranslation('clearViewpoints', language)}
                     </button>
@@ -467,7 +484,7 @@ const Step3SceneGeneration: React.FC<Step3SceneGenerationProps> = ({
                                 <p className="text-xs mt-1 text-center">{scene.error.substring(0, 50)}...</p>
                                 <button 
                                     onClick={generateScenes}
-                                    className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                                    className="mt-2 px-3 py-1 bg-indigo-500 text-white text-xs rounded hover:bg-indigo-600"
                                 >
                                     {getTranslation('retry', language)}
                                 </button>

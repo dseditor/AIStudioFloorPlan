@@ -30,7 +30,7 @@ const Stepper: React.FC<StepperProps> = ({ currentStep, maxStep, language }) => 
                             className={`
                                 w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold transition-all duration-300
                                 ${step.id === currentStep 
-                                    ? 'bg-blue-700 text-white border-blue-700' 
+                                    ? 'bg-indigo-700 text-white border-indigo-700' 
                                     : step.id < currentStep 
                                         ? 'bg-green-600 text-white border-green-600' 
                                         : 'border-slate-300 text-slate-500'
@@ -47,7 +47,7 @@ const Stepper: React.FC<StepperProps> = ({ currentStep, maxStep, language }) => 
                         <div 
                             className={`
                                 h-0.5 flex-grow mx-4 transition-all duration-300
-                                ${step.id < currentStep ? 'bg-blue-700' : 'bg-slate-300'}
+                                ${step.id < currentStep ? 'bg-indigo-700' : 'bg-slate-300'}
                             `}
                         />
                     )}

@@ -203,19 +203,24 @@ export async function generateArchitecturalImage(parts: any[]): Promise<string> 
  * @param baseImageSrc Source image URL or data URL
  * @param promptOverride Optional prompt override
  * @param maskBase64 Optional mask for editing specific areas
- * @returns Promise resolving to generated image data URL
+ * @param numberOfImages The number of image variations to generate.
+ * @returns Promise resolving to an array of generated image data URLs.
  */
 export async function generateAIRendering(
-    baseImageSrc: string, 
-    promptOverride?: string, 
-    maskBase64?: string
-): Promise<string> {
+    baseImageSrc: string,
+    promptOverride?: string,
+    maskBase64?: string,
+    numberOfImages: number = 1
+): Promise<string[]> {
     const baseImage64 = await imageSrcToBase64(baseImageSrc);
     
-    let parts;
+    const generationPromises: Promise<string>[] = [];
 
-    if (maskBase64) {
-        const maskPrompt = generatePromptVariations(`Using the provided black and white mask image, make precise modifications to the base image, which is an architectural top-down view. Apply the following changes: "${promptOverride}"
+    for (let i = 0; i < numberOfImages; i++) {
+        const promise = (async () => {
+            let parts;
+            if (maskBase64) {
+                const maskPrompt = generatePromptVariations(`Using the provided black and white mask image, make precise modifications to the base image, which is an architectural top-down view. Apply the following changes: "${promptOverride}"
 
 PERSPECTIVE INSTRUCTIONS:
 - The base image is a TOP-DOWN ARCHITECTURAL VIEW (bird's-eye view).
@@ -231,13 +236,13 @@ MASKING INSTRUCTIONS:
 QUALITY REQUIREMENTS:
 - Maintain the original lighting, style, and perspective.
 - Ensure the edits are photorealistic and high-quality.`);
-        parts = [
-            { text: maskPrompt },
-            { inlineData: { mimeType: 'image/png', data: baseImage64 } },
-            { inlineData: { mimeType: 'image/png', data: maskBase64 } }
-        ];
-    } else {
-        const defaultPrompt = `Transform this 2D architectural floor plan into a precise, high-quality 3D rendered top-down view with the following requirements:
+                parts = [
+                    { text: maskPrompt },
+                    { inlineData: { mimeType: 'image/png', data: baseImage64 } },
+                    { inlineData: { mimeType: 'image/png', data: maskBase64 } }
+                ];
+            } else {
+                const defaultPrompt = `Transform this 2D architectural floor plan into a precise, high-quality 3D rendered top-down view with the following requirements:
 
 CLEANING REQUIREMENTS:
 - COMPLETELY REMOVE all text, Chinese characters, numbers, dimension markings, labels, room names, symbols that are not part of the architecture, and human figures.
@@ -261,14 +266,18 @@ VISUAL ENHANCEMENT:
 - Ensure clean, crisp edges and professional presentation.
 
 IMPORTANT: Generate a clean, professional architectural visualization that accurately represents the spatial layout while removing all textual elements and correctly interpreting the specified architectural symbols.`;
-        
-        parts = [
-            { text: generatePromptVariations(promptOverride || defaultPrompt) },
-            { inlineData: { mimeType: 'image/jpeg', data: baseImage64 } }
-        ];
+                
+                parts = [
+                    { text: generatePromptVariations(promptOverride || defaultPrompt) },
+                    { inlineData: { mimeType: 'image/jpeg', data: baseImage64 } }
+                ];
+            }
+            return await generateArchitecturalImage(parts);
+        })();
+        generationPromises.push(promise);
     }
 
-    return await generateArchitecturalImage(parts);
+    return await Promise.all(generationPromises);
 }
 
 /**

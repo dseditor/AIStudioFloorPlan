@@ -10,7 +10,6 @@ import Step2Rendering from './components/Step2Rendering';
 import Step3SceneGeneration, { GeneratedScene, ScenePoint } from './components/Step3SceneGeneration';
 import Step4SceneEditing from './components/Step4SceneEditing';
 import Step5Presentation from './components/Step5Presentation';
-// FIX: Corrected import path for i18n module.
 import { Language, getTranslation } from './lib/i18n';
 
 type AppState = 'language' | 'step1' | 'step2' | 'step3' | 'step4' | 'step5';
@@ -119,8 +118,8 @@ function App() {
     const canGoPrev = (): boolean => {
         return currentStep !== 'step1' && currentStep !== 'language';
     };
-
-    // Show language selector if not set
+    
+    // Show language selector if on 'language' step
     if (currentStep === 'language') {
         return <LanguageSelector onLanguageSelect={handleLanguageSelect} />;
     }
@@ -229,7 +228,7 @@ function App() {
                                 <button 
                                     onClick={goToNextStep}
                                     disabled={!canGoNext()}
-                                    className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {getTranslation('nextStep', language)}
                                 </button>

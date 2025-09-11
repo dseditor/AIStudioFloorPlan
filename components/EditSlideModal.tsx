@@ -90,7 +90,7 @@ const EditSlideModal: React.FC<EditSlideModalProps> = ({ isOpen, onClose, slideD
                                 type="text"
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
-                                className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-slate-900"
+                                className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white text-slate-900"
                             />
                         </div>
                     )}
@@ -104,7 +104,7 @@ const EditSlideModal: React.FC<EditSlideModalProps> = ({ isOpen, onClose, slideD
                             rows={slideData.type === 'concept' ? 10 : 6}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white text-slate-900"
+                            className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white text-slate-900"
                         />
                     </div>
                 </div>
@@ -118,7 +118,7 @@ const EditSlideModal: React.FC<EditSlideModalProps> = ({ isOpen, onClose, slideD
                     </button>
                     <button
                         onClick={handleSave}
-                        className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                        className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
                     >
                         {getTranslation('saveChanges', language)}
                     </button>

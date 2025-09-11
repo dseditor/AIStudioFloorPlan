@@ -167,7 +167,7 @@ const Step5Presentation: React.FC<Step5PresentationProps> = ({ finalPlanImage, g
 
     const renderLoading = (messageKey: 'generatingPresentation' | 'generatingSlides') => (
         <div className="flex flex-col items-center justify-center h-64">
-            <div className="loader border-4 border-blue-200 border-t-blue-600 rounded-full w-12 h-12 animate-spin mb-4" />
+            <div className="loader border-4 border-indigo-200 border-t-indigo-600 rounded-full w-12 h-12 animate-spin mb-4" />
             <p className="font-semibold text-slate-600">{getTranslation(messageKey, language)}</p>
         </div>
     );
@@ -198,7 +198,7 @@ const Step5Presentation: React.FC<Step5PresentationProps> = ({ finalPlanImage, g
                         <button 
                             key={theme.nameKey}
                             onClick={() => setSelectedTheme(theme)}
-                            className={`p-4 rounded-lg border-2 transition-all duration-200 ${selectedTheme.nameKey === theme.nameKey ? 'border-blue-500 ring-2 ring-blue-500' : 'border-slate-300 hover:border-blue-400'}`}
+                            className={`p-4 rounded-lg border-2 transition-all duration-200 ${selectedTheme.nameKey === theme.nameKey ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-slate-300 hover:border-indigo-400'}`}
                         >
                             <div className="flex items-center gap-3">
                                 <div className="w-6 h-6 rounded-full" style={{ backgroundColor: theme.colors.accent }}></div>
@@ -253,7 +253,7 @@ const Step5Presentation: React.FC<Step5PresentationProps> = ({ finalPlanImage, g
                     <button 
                         onClick={() => setShowSlideshow(true)}
                         disabled={slideImages.length === 0 || isGeneratingSlides}
-                        className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {getTranslation('viewSlideshow', language)}
                     </button>

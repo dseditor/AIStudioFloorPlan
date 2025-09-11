@@ -67,7 +67,7 @@ const Step1Upload: React.FC<Step1UploadProps> = ({ onImageUpload, uploadedImage,
                 <div>
                     <label 
                         htmlFor="file-upload" 
-                        className="cursor-pointer bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                        className="cursor-pointer bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors duration-200"
                     >
                         {uploadedImage ? getTranslation('reuploadButton', language) : getTranslation('uploadButton', language)}
                     </label>
@@ -81,9 +81,9 @@ const Step1Upload: React.FC<Step1UploadProps> = ({ onImageUpload, uploadedImage,
                 </div>
                 
                 {isAnalyzing && (
-                    <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
-                        <div className="loader border-4 border-blue-200 border-t-blue-600 rounded-full w-8 h-8 animate-spin" />
-                        <span className="font-semibold text-blue-700">{getTranslation('analyzingIndicator', language)}</span>
+                    <div className="flex items-center gap-3 p-4 bg-indigo-50 rounded-lg">
+                        <div className="loader border-4 border-indigo-200 border-t-indigo-600 rounded-full w-8 h-8 animate-spin" />
+                        <span className="font-semibold text-indigo-700">{getTranslation('analyzingIndicator', language)}</span>
                     </div>
                 )}
             </div>

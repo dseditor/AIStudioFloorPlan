@@ -28,23 +28,62 @@ const Step2Rendering: React.FC<Step2RenderingProps> = ({ originalImage, onRender
     const [imageHistory, setImageHistory] = useState<ImageHistory[]>([]);
     const [currentMask, setCurrentMask] = useState<string>('');
     const [isSuggesting, setIsSuggesting] = useState(false);
+    const [numberOfImages, setNumberOfImages] = useState(1);
+    const [generatedOptions, setGeneratedOptions] = useState<string[]>([]);
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [selectedCandidate, setSelectedCandidate] = useState<string | null>(null);
     
     const canvasRef = useRef<DrawingCanvasRef>(null);
 
-    const generateInitialRendering = async () => {
+    const previewSelection = (url: string) => {
+        setSelectedCandidate(url);
+    };
+
+    const confirmSelection = () => {
+        if (!selectedCandidate) return;
+
+        // Add the previous image to history before replacing it with the new selection.
+        if (renderedImage && !imageHistory.some(h => h.url === renderedImage)) {
+             setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
+        }
+        
+        setRenderedImage(selectedCandidate);
+        setGeneratedOptions([]);
+        setIsSelecting(false);
+        setSelectedCandidate(null);
+        setShowConfirmation(false);
+        setShowEditingControls(true);
+        if (onRenderingComplete) {
+            onRenderingComplete(selectedCandidate);
+        }
+    };
+
+    const cancelSelection = () => {
+        setSelectedCandidate(null);
+    };
+
+    const handleInitialGeneration = async () => {
         if (!originalImage) return;
         
         setIsGenerating(true);
         setShowConfirmation(false);
         setShowEditingControls(false);
+        setIsSelecting(false);
+        setGeneratedOptions([]);
+        setSelectedCandidate(null);
         
         try {
-            const result = await generateAIRendering(originalImage);
-            setRenderedImage(result);
-            setShowConfirmation(true);
+            const results = await generateAIRendering(originalImage, undefined, undefined, numberOfImages);
             
-            if (onRenderingComplete) {
-                onRenderingComplete(result);
+            if (results.length === 1) {
+                setRenderedImage(results[0]);
+                setShowConfirmation(true);
+                if (onRenderingComplete) {
+                    onRenderingComplete(results[0]);
+                }
+            } else {
+                setGeneratedOptions(results);
+                setIsSelecting(true);
             }
         } catch (error) {
             console.error('Failed to generate AI rendering:', error);
@@ -62,7 +101,7 @@ const Step2Rendering: React.FC<Step2RenderingProps> = ({ originalImage, onRender
     const rejectRendering = () => {
         setShowConfirmation(false);
         setImageHistory([]); // Clear history for fresh start
-        generateInitialRendering(); // Regenerate from original
+        handleInitialGeneration();
     };
 
     const submitCorrection = async () => {
@@ -74,27 +113,36 @@ const Step2Rendering: React.FC<Step2RenderingProps> = ({ originalImage, onRender
         }
         
         setIsGenerating(true);
+        setIsSelecting(false);
+        setGeneratedOptions([]);
+        setSelectedCandidate(null);
         
         try {
-            if (renderedImage) {
-                setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
-            }
-            
-            const result = await generateAIRendering(
+            const results = await generateAIRendering(
                 renderedImage, 
                 correctionInput, 
-                maskBase64
+                maskBase64,
+                numberOfImages
             );
-            setRenderedImage(result);
-            setCorrectionInput('');
+
+            if (results.length === 1) {
+                if (renderedImage) {
+                    setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
+                }
+                setRenderedImage(results[0]);
+                if (onRenderingComplete) {
+                    onRenderingComplete(results[0]);
+                }
+            } else {
+                setGeneratedOptions(results);
+                setIsSelecting(true);
+            }
             
+            setCorrectionInput('');
             if (canvasRef.current) {
                 canvasRef.current.clearCanvas();
             }
-            
-            if (onRenderingComplete) {
-                onRenderingComplete(result);
-            }
+
         } catch (error) {
             console.error('Failed to apply correction:', error);
             alert(getTranslation('correctionFailed', language));
@@ -149,22 +197,69 @@ MAINTAIN PRECISION:
 IMPORTANT: Generate a photorealistic architectural visualization with enhanced materials, ensuring correct interpretation of symbols and color diversity for furniture.`;
 
         setIsGenerating(true);
+        setIsSelecting(false);
+        setGeneratedOptions([]);
+        setSelectedCandidate(null);
         
         try {
-            // Add current image to history
-            if (renderedImage) {
-                setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
-            }
+            const results = await generateAIRendering(renderedImage, autoMaterialPrompt, undefined, numberOfImages);
             
-            const result = await generateAIRendering(renderedImage, autoMaterialPrompt);
-            setRenderedImage(result);
-            
-            if (onRenderingComplete) {
-                onRenderingComplete(result);
+            if (results.length === 1) {
+                if (renderedImage) {
+                    setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
+                }
+                setRenderedImage(results[0]);
+                if (onRenderingComplete) {
+                    onRenderingComplete(results[0]);
+                }
+            } else {
+                setGeneratedOptions(results);
+                setIsSelecting(true);
             }
         } catch (error) {
             console.error('Failed to apply auto material:', error);
             alert(getTranslation('autoMaterialFailed', language));
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleDollhouseGeneration = async () => {
+        if (!renderedImage) return;
+    
+        setIsGenerating(true);
+        setIsSelecting(false);
+        setGeneratedOptions([]);
+        setSelectedCandidate(null);
+    
+        const dollhousePrompt = `Transform this top-down 3D floor plan into a photorealistic, fully furnished, and decorated 3D dollhouse view. The final image MUST be rendered from a 45-degree axonometric perspective (isometric view), providing a clear 3D representation of the space.
+
+REQUIREMENTS:
+- **Full Furnishing:** Add appropriate and stylish furniture to all rooms (beds, sofas, tables, etc.), consistent with the room's purpose.
+- **Rich Decoration:** Include decorative elements like rugs, plants, artwork, and lighting fixtures to create a lived-in, aesthetically pleasing atmosphere.
+- **Detailed Textures:** Apply realistic textures to all surfaces, including floors, walls, and furniture.
+- **Realistic Lighting:** Implement natural lighting with soft shadows that enhance the 3D depth and realism of the scene.
+- **Architectural Integrity:** Maintain the original wall layout, window, and door placements from the source plan.
+- **Aesthetics:** The final output should be a beautiful, high-quality interior design visualization.`;
+    
+        try {
+            const results = await generateAIRendering(renderedImage, dollhousePrompt, undefined, numberOfImages);
+            
+            if (results.length === 1) {
+                if (renderedImage) {
+                    setImageHistory(prev => [...prev, { url: renderedImage, timestamp: Date.now() }]);
+                }
+                setRenderedImage(results[0]);
+                if (onRenderingComplete) {
+                    onRenderingComplete(results[0]);
+                }
+            } else {
+                setGeneratedOptions(results);
+                setIsSelecting(true);
+            }
+        } catch (error) {
+            console.error('Failed to generate dollhouse view:', error);
+            alert(getTranslation('dollhouseGenerationFailed', language));
         } finally {
             setIsGenerating(false);
         }
@@ -198,6 +293,23 @@ IMPORTANT: Generate a photorealistic architectural visualization with enhanced m
             canvasRef.current.clearCanvas();
         }
     };
+    
+    const NumberOfImagesSelector = () => (
+        <div className="mb-4">
+            <label className="block text-center font-semibold mb-2 text-slate-700">{getTranslation('numberOfImagesLabel', language)}</label>
+            <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4].map(num => (
+                    <button
+                        key={num}
+                        onClick={() => setNumberOfImages(num)}
+                        className={`px-4 py-2 rounded-lg font-semibold border-2 transition-colors ${numberOfImages === num ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-400'}`}
+                    >
+                        {`${num} ${num > 1 ? getTranslation('images', language) : getTranslation('image', language)}`}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
 
     return (
         <div className="w-full max-w-6xl mx-auto">
@@ -232,37 +344,77 @@ IMPORTANT: Generate a photorealistic architectural visualization with enhanced m
                 <div>
                     <h3 className="font-bold text-lg mb-2 text-center">{getTranslation('aiRenderingArea', language)}</h3>
                     <div className="border-2 border-slate-200 rounded-lg p-2 bg-slate-50 min-h-[300px] relative">
-                        {isGenerating ? (
+                        {isGenerating && !isSelecting ? (
                             <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
-                                <div className="loader border-4 border-blue-200 border-t-blue-600 rounded-full w-12 h-12 animate-spin mb-3"></div>
+                                <div className="loader border-4 border-indigo-200 border-t-indigo-600 rounded-full w-12 h-12 animate-spin mb-3"></div>
                                 <p className="font-semibold text-slate-600">{getTranslation('aiGenerating', language)}</p>
                             </div>
-                        ) : renderedImage ? (
+                        ) : renderedImage && !isSelecting ? (
                             <DrawingCanvas 
                                 ref={canvasRef}
                                 imageUrl={renderedImage}
                                 onMaskChange={setCurrentMask}
                             />
-                        ) : (
+                        ) : !isSelecting ? (
                             <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-slate-400">
-                                <p className="text-center mb-4">{getTranslation('startAIRendering', language)}</p>
-                                <button 
-                                    onClick={generateInitialRendering}
-                                    className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    {getTranslation('startAIRendering', language)}
-                                </button>
+                                <p className="text-center mb-4">{getTranslation('initialRenderingPrompt', language)}</p>
+                                <NumberOfImagesSelector />
+                                <div className="flex justify-center mt-2">
+                                    <button 
+                                        onClick={handleInitialGeneration}
+                                        className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors w-48 text-center"
+                                    >
+                                        {getTranslation('startRenderingButton', language)}
+                                    </button>
+                                </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </div>
+
+            {/* Image Selection Panel */}
+            {isSelecting && (
+                <div className="mt-8 p-6 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    {selectedCandidate ? (
+                        <div>
+                            <h3 className="text-lg font-semibold text-indigo-800 mb-3 text-center">{getTranslation('selectionConfirmationTitle', language)}</h3>
+                            <img src={selectedCandidate} alt="Selected candidate for confirmation" className="w-full max-w-lg mx-auto h-auto rounded-lg mb-4 border-4 border-indigo-500 shadow-lg" />
+                            <div className="flex justify-center gap-4">
+                                <button onClick={confirmSelection} className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">
+                                    {getTranslation('confirmSelectionButton', language)}
+                                </button>
+                                <button onClick={cancelSelection} className="px-6 py-2 bg-slate-500 text-white font-semibold rounded-lg hover:bg-slate-600">
+                                    {getTranslation('backToSelectionButton', language)}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <h3 className="text-lg font-semibold text-indigo-800 mb-3">{getTranslation('chooseRenderingTitle', language)}</h3>
+                            <p className="text-indigo-700 mb-6">{getTranslation('chooseRenderingDescription', language)}</p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {generatedOptions.map((url, index) => (
+                                    <div key={index} className="relative group cursor-pointer" onClick={() => previewSelection(url)}>
+                                        <img src={url} alt={`Generated option ${index + 1}`} className="w-full h-auto rounded-lg border-2 border-transparent group-hover:border-indigo-500 transition-all" />
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                                            <span className="px-4 py-2 bg-white text-slate-800 font-semibold rounded-md">
+                                                {getTranslation('selectThisImage', language)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
             
             {/* Confirmation Panel */}
-            {showConfirmation && (
-                <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h3 className="text-lg font-semibold text-blue-800 mb-3">{getTranslation('confirmRenderingTitle', language)}</h3>
-                    <p className="text-blue-700 mb-6">{getTranslation('confirmRenderingDescription', language)}</p>
+            {showConfirmation && !isSelecting && (
+                <div className="mt-8 p-6 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <h3 className="text-lg font-semibold text-indigo-800 mb-3">{getTranslation('confirmRenderingTitle', language)}</h3>
+                    <p className="text-indigo-700 mb-6">{getTranslation('confirmRenderingDescription', language)}</p>
                     <div className="flex flex-wrap gap-3">
                         <button 
                             onClick={acceptRendering}
@@ -281,7 +433,7 @@ IMPORTANT: Generate a photorealistic architectural visualization with enhanced m
             )}
             
             {/* Editing Controls */}
-            {showEditingControls && (
+            {showEditingControls && !isSelecting && (
                 <div className="mt-8 space-y-4">
                     <div>
                         <label htmlFor="correction-input" className="block font-semibold mb-3 text-slate-700">
@@ -293,7 +445,7 @@ IMPORTANT: Generate a photorealistic architectural visualization with enhanced m
                                 id="correction-input"
                                 value={correctionInput}
                                 onChange={(e) => setCorrectionInput(e.target.value)}
-                                className="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-slate-900" 
+                                className="flex-grow px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-slate-900" 
                                 placeholder={getTranslation('correctionInputPlaceholder', language)}
                             />
                              <button 
@@ -311,17 +463,29 @@ IMPORTANT: Generate a photorealistic architectural visualization with enhanced m
                                     </>
                                 ) : getTranslation('suggestImprovement', language)}
                             </button>
-                            <button 
-                                onClick={submitCorrection}
-                                disabled={isGenerating || isSuggesting}
-                                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 whitespace-nowrap"
-                            >
-                                {getTranslation('submitCorrection', language)}
-                            </button>
+                        </div>
+                        <div className="p-4 bg-slate-100 rounded-lg border border-slate-200">
+                             <NumberOfImagesSelector />
+                             <div className="flex justify-end mt-2">
+                                <button 
+                                    onClick={submitCorrection}
+                                    disabled={isGenerating || isSuggesting}
+                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+                                >
+                                    {getTranslation('submitCorrection', language)}
+                                </button>
+                             </div>
                         </div>
                     </div>
 
                     <div className="flex flex-wrap gap-3 pt-2">
+                        <button 
+                            onClick={handleDollhouseGeneration}
+                            disabled={isGenerating}
+                            className="px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                        >
+                            {getTranslation('createDollhouseView', language)}
+                        </button>
                         <button 
                             onClick={applyAutoMaterial}
                             disabled={isGenerating}
